@@ -1,201 +1,275 @@
-# OpenClaw Skill 市场
+# Weiyuan AI
 
-基于产品需求文档构建的 Skill 分发与商业化变现平台。
+Weiyuan AI 是一个集成了 AI 生成功能（图片/视频）的综合性平台，提供技能市场、API 市场、AI 创作等核心功能。
 
-## 技术栈
+## ✨ 功能特性
 
-- **前端**: React + Vite + Zustand
-- **后端**: Node.js + Express
+### 核心功能
+- **AI 创作** - 支持图片/视频生成，可配置多种 AI 模型
+- **技能市场** - 浏览、购买、安装各类技能插件
+- **API 市场** - 统一的 API 调用接口，支持多种 AI 服务
+- **生成记录** - 查看历史生成记录和资源管理
+- **个人中心** - 账户管理、订单记录、调用记录、积分充值
+
+### 管理后台
+- 仪表盘统计
+- Skill 管理
+- API 端点管理
+- 订单管理
+- 用户管理
+- 财务统计
+- 系统设置
+
+## 🏗️ 技术栈
+
+### 前端
+- **框架**: React 18 + Vite
+- **状态管理**: Zustand
+- **路由**: React Router DOM 6
+- **HTTP 客户端**: Axios
+- **图标库**: Lucide React
+- **CSS**: 自定义 CSS 变量（白色主题）
+
+### 后端
+- **运行时**: Node.js
+- **框架**: Express
 - **数据库**: MySQL + Sequelize ORM
-- **缓存**: Redis (ioredis) - 高性能计费
+- **缓存**: Redis
+- **认证**: JWT
+- **文件上传**: Multer
+- **安全**: Helmet, express-rate-limit
 
-## 项目结构
+## 📦 安装
 
-```
-├── server/                 # 后端服务
-│   ├── src/
-│   │   ├── config/        # 数据库和 Redis 配置
-│   │   ├── models/        # Sequelize 模型
-│   │   ├── routes/       # API 路由
-│   │   └── index.js      # 入口文件
-│   ├── package.json
-│   └── .env.example
-│
-├── client/                 # 前端应用
-│   ├── src/
-│   │   ├── pages/        # 页面组件
-│   │   ├── components/   # 通用组件
-│   │   ├── context/      # 状态管理
-│   │   ├── utils/        # 工具函数
-│   │   └── styles/       # 样式文件
-│   ├── package.json
-│   └── vite.config.js
-│
-├── start.bat              # Windows 一键启动脚本
-├── start.ps1             # PowerShell 一键启动脚本
-└── 产品.md                # 产品需求文档
-```
+### 环境要求
+- Node.js >= 18.x
+- MySQL >= 8.0
+- Redis >= 6.0
 
-## 快速启动
-
-### Windows 一键启动
-
-双击运行 `start.bat` 即可自动完成以下操作：
-1. 检查 Node.js、MySQL、Redis
-2. 创建数据库（如果不存在）
-3. 复制配置文件
-4. 安装依赖
-5. 启动后端 + 前端服务
-
-### 手动启动
-
+### 1. 克隆项目
 ```bash
-# 安装依赖
-cd server && npm install
-cd ../client && npm install
-
-# 配置环境变量
-cp server/.env.example server/.env
-# 编辑 server/.env 填写数据库密码
-
-# 启动后端
-cd server && npm run dev
-
-# 启动前端 (新开终端)
-cd client && npm run dev
+git clone https://github.com/LX1309244704/weiyuan_ai.git
+cd weiyuan_ai
 ```
 
-## 核心功能
+### 2. 安装前端依赖
+```bash
+cd client
+npm install
+```
 
-### 后端 API
+### 3. 安装后端依赖
+```bash
+cd server
+npm install
+```
 
-| 模块 | 路由 | 说明 |
-|------|------|------|
-| 认证 | `/api/auth` | 注册、登录、JWT |
-| 用户 | `/api/users` | 余额、API Key 管理 |
-| Skills | `/api/skills` | 技能列表、详情 |
-| 订单 | `/api/orders` | 创建订单、查询 |
-| 计费 | `/api/billing` | 高性能扣费 (Redis) |
-| 支付 | `/api/payment` | 微信/支付宝回调 |
-| 管理 | `/api/admin` | 仪表盘、用户管理 |
+### 4. 配置环境变量
 
-### 高性能计费 (产品需求: 5000 QPS)
-
-- **Redis 原子操作**: 余额扣减使用 `DECRBY`，保证不超扣
-- **幂等性**: 通过 `invocationId` 防止重复扣费
-- **异步写入**: 调用流水异步写入数据库，避免数据库瓶颈
-- **缓存一致性**: 每日对账机制，发现不一致自动修复
-
-### 前端页面
-
-- 首页 / Skill 市场
-- Skill 详情页 + 购买
-- 个人中心 (API Key、余额明细、订单、调用记录)
-- 管理后台 (仪表盘、Skill/订单/用户管理、对账)
-
-## 环境配置
-
-### 前置要求
-
-- Node.js 18+
-- MySQL 8.0+
-- Redis 6.0+
-
-### 环境变量 (server/.env)
-
-```env
+后端配置（`server/.env`）：
+```bash
 # 数据库配置
 DB_HOST=localhost
 DB_PORT=3306
-DB_NAME=skill_marketplace
+DB_NAME=weiyuan_ai
 DB_USER=root
 DB_PASSWORD=your_password
 
 # Redis 配置
 REDIS_HOST=localhost
 REDIS_PORT=6379
+REDIS_PASSWORD=
 
-# JWT 配置
-JWT_SECRET=your_jwt_secret_key_here
+# JWT 密钥
+JWT_SECRET=your_jwt_secret_key_change_in_production
+
+# 服务器配置
 PORT=3000
+NODE_ENV=development
 
-# 可选：管理员账户配置
-ADMIN_EMAIL=admin@example.com
-ADMIN_PASSWORD=admin123
+# 支付配置（微信支付）
+WECHAT_MCH_ID=your_mch_id
+WECHAT_API_KEY=your_wechat_api_key
+
+# 支付配置（支付宝）
+ALIPAY_APP_ID=your_alipay_app_id
+ALIPAY_PRIVATE_KEY=your_alipay_private_key
+ALIPAY_PUBLIC_KEY=alipay_public_key
 ```
 
-## 账户说明
+### 5. 数据库初始化
 
-### 普通用户
+```bash
+# 创建数据库
+mysql -u root -p -e "CREATE DATABASE weiyuan_ai CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
 
-- 注册：访问 http://localhost:5173/register
-- 登录：访问 http://localhost:5173/login
-- 登录后可购买积分包、获取 API Key
+# 运行数据库迁移
+cd server
+node migrate.js
+```
 
-### 管理员
+## 🚀 运行
 
-系统会自动创建默认管理员账户：
+### 开发模式
 
-| 属性 | 默认值 |
-|------|--------|
-| 邮箱 | admin@example.com |
-| 密码 | admin123 |
+启动后端服务：
+```bash
+cd server
+npm run dev
+```
 
-**登录方式**：
-1. 访问 http://localhost:5173/login
-2. 使用管理员邮箱和密码登录
-3. 登录后访问 http://localhost:5173/admin 进入管理后台
+启动前端开发服务器：
+```bash
+cd client
+npm run dev
+```
 
-**修改默认管理员**：
-- 通过环境变量修改：`ADMIN_EMAIL` 和 `ADMIN_PASSWORD`
-- 或在数据库中修改：`UPDATE users SET role = 'admin' WHERE email = 'your@email.com'`
+访问：http://localhost:5173
 
-## 计费 API (OpenClaw Skill 接入)
+### 生产模式
 
-```javascript
-// Skill 代码中调用
-const response = await fetch('/api/billing/consume', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    apiKey: '用户APIKey',
-    skillId: 'Skill ID',
-    invocationId: '唯一调用ID(UUID)'
-  })
-});
+构建前端：
+```bash
+cd client
+npm run build
+```
 
-const result = await response.json();
+启动后端（包含静态文件服务）：
+```bash
+cd server
+npm start
+```
 
-if (result.success) {
-  // 扣费成功，remaining 为剩余积分
-  console.log('剩余积分:', result.remaining);
-} else if (response.status === 402) {
-  // 余额不足，引导用户购买
-  window.location.href = result.buyLink;
+访问：http://localhost:3000
+
+## 📁 项目结构
+
+```
+weiyuan_ai/
+├── client/                     # 前端项目
+│   ├── src/
+│   │   ├── components/         # 公共组件
+│   │   │   ├── admin/          # 管理后台组件
+│   │   │   ├── generate/       # AI 生成组件
+│   │   │   ├── Layout.jsx      # 通用布局
+│   │   │   ├── Modal.jsx       # 模态框
+│   │   │   └── TopNavigationBar.jsx  # 顶部导航栏
+│   │   ├── context/            # React Context
+│   │   │   └── AuthContext.jsx # 认证上下文
+│   │   ├── pages/              # 页面组件
+│   │   │   ├── HomeNew.jsx     # 技能市场
+│   │   │   ├── ApiListNew.jsx  # API 市场
+│   │   │   ├── GenerateNew.jsx # AI 创作
+│   │   │   ├── ProfileNew.jsx  # 个人中心
+│   │   │   └── ...
+│   │   ├── styles/             # 全局样式
+│   │   │   ├── generate.css    # AI 生成页面样式
+│   │   │   └── global.css      # 全局样式
+│   │   ├── utils/              # 工具函数
+│   │   │   └── api.js          # API 请求封装
+│   │   ├── App.jsx             # 路由配置
+│   │   └── main.jsx            # 入口文件
+│   ├── package.json
+│   └── vite.config.js
+│
+├── server/                     # 后端项目
+│   ├── src/
+│   │   ├── config/             # 配置文件
+│   │   │   ├── database.js     # 数据库配置
+│   │   │   └── redis.js        # Redis 配置
+│   │   ├── models/             # 数据模型
+│   │   │   ├── User.js         # 用户模型
+│   │   │   ├── Skill.js        # 技能模型
+│   │   │   ├── Order.js        # 订单模型
+│   │   │   ├── ApiEndpoint.js  # API 端点模型
+│   │   │   └── ...
+│   │   ├── routes/             # 路由
+│   │   │   ├── auth.js         # 认证路由
+│   │   │   ├── skills.js       # 技能路由
+│   │   │   ├── orders.js       # 订单路由
+│   │   │   ├── generate.js     # AI 生成路由
+│   │   │   ├── admin.js        # 管理后台路由
+│   │   │   └── ...
+│   │   ├── utils/              # 工具函数
+│   │   │   ├── encryption.js   # 加密工具
+│   │   │   └── storage.js      # 存储工具
+│   │   └── index.js            # 入口文件
+│   ├── public/                 # 静态资源
+│   ├── uploads/                # 上传文件
+│   ├── init.sql                # 数据库初始化脚本
+│   ├── migrate.js              # 数据库迁移脚本
+│   └── package.json
+│
+├── README.md
+└── .gitignore
+```
+
+## 🔑 API 接口
+
+### 认证接口
+- `POST /api/auth/login` - 用户登录
+- `POST /api/auth/register` - 用户注册
+
+### 技能接口
+- `GET /api/skills` - 获取技能列表
+- `GET /api/skills/:id` - 获取技能详情
+- `GET /api/skills/:id/install` - 安装技能
+
+### API 市场
+- `GET /api/proxy/endpoints` - 获取 API 端点列表
+- `POST /api/proxy/:endpoint` - 调用 API
+
+### AI 生成
+- `POST /api/generate/image` - 生成图片
+- `POST /api/generate/video` - 生成视频
+
+### 用户接口
+- `GET /api/users/me` - 获取当前用户信息
+- `GET /api/users/balance-logs` - 获取余额变动记录
+- `GET /api/users/orders` - 获取订单记录
+- `GET /api/users/invocations` - 获取调用记录
+
+## 💰 积分系统
+
+- 充值比例：¥1 = 100 积分
+- 技能/价格：按次计费
+- API 调用：按次计费
+
+## 📝 开发说明
+
+### 添加新的 AI 生成模型
+
+1. 在 `client/src/pages/GenerateNew.jsx` 的 `MODELS` 数组中添加新模型
+2. 在后端 `server/src/routes/generate.js` 添加对应的生成逻辑
+3. 在管理后台配置 API 端点
+
+### 自定义主题颜色
+
+编辑 `client/src/styles/generate.css` 中的 CSS 变量：
+
+```css
+:root {
+  --ai-bg-primary: #ffffff;
+  --ai-bg-secondary: #f9fafb;
+  --ai-accent-green: #10b981;
+  --ai-accent-blue: #3b82f6;
+  /* ... */
 }
 ```
 
-## 产品需求对照
+## 🛡️ 安全
 
-| 需求 | 实现 |
-|------|------|
-| 用户注册/登录 | ✓ JWT 认证 |
-| Skill 市场展示 | ✓ 首页 + 详情页 |
-| 购买积分包 | ✓ 订单 + 支付回调 |
-| 个人中心 | ✓ API Key、余额、订单、调用记录 |
-| 管理后台 | ✓ 仪表盘、CRUD、对账 |
-| 高并发计费 | ✓ Redis 原子操作 (5000 QPS) |
-| 幂等性 | ✓ invocationId 防重 |
-| 对账机制 | ✓ 缓存与数据库比对 |
+- JWT 身份验证
+- 密码 bcrypt 加密
+- 请求速率限制
+- CORS 跨域保护
+- SQL 注入防护（Sequelize ORM）
 
-## 访问地址
-
-| 服务 | 地址 |
-|------|------|
-| 前端 | http://localhost:5173 |
-| 后端 API | http://localhost:3000 |
-| 管理后台 | http://localhost:5173/admin |
-
-## License
+## 📄 License
 
 MIT
+
+## 👥 联系方式
+
+- GitHub: https://github.com/LX1309244704/weiyuan_ai
+- 问题反馈：请在 GitHub 提交 Issue

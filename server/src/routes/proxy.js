@@ -156,6 +156,9 @@ function buildTargetHeaders(endpoint, userHeaders) {
 router.use(async (req, res, next) => {
   const startTime = Date.now();
   let invocationRecord = null;
+  let user = null;
+  let endpoint = null;
+  let cost = 0;
 
   try {
     let apiKey = req.headers['x-api-key'] || req.headers['authorization'];
@@ -171,7 +174,7 @@ router.use(async (req, res, next) => {
       });
     }
 
-    const user = await User.findOne({ where: { apiKey } });
+    user = await User.findOne({ where: { apiKey } });
     if (!user) {
       return res.status(401).json({ 
         success: false,
@@ -190,7 +193,7 @@ router.use(async (req, res, next) => {
     }
 
     const fullPath = pathParts.join('/');
-    const endpoint = await ApiEndpoint.findOne({
+    endpoint = await ApiEndpoint.findOne({
       where: {
         pathPrefix: fullPath,
         isActive: true
@@ -204,6 +207,9 @@ router.use(async (req, res, next) => {
         code: 'ENDPOINT_NOT_FOUND'
       });
     }
+
+    cost = endpoint.pricePerCall;
+    console.log(`[PROXY] Endpoint found: ${endpoint.name}, cost: ${cost} points`);
 
     const rateLimitResult = await checkRateLimit(user.id, endpoint.id, endpoint.rateLimit);
     if (!rateLimitResult.allowed) {
@@ -238,7 +244,8 @@ router.use(async (req, res, next) => {
       currentBalance = parseInt(currentBalance, 10);
     }
 
-    const cost = endpoint.pricePerCall;
+    console.log(`[PROXY] User ${user.id} balance: ${currentBalance} points, cost: ${cost} points`);
+    
     if (currentBalance < cost) {
       return res.status(402).json({
         success: false,
@@ -251,6 +258,8 @@ router.use(async (req, res, next) => {
     }
 
     const newBalance = await redis.decrby(balanceKey, cost);
+    console.log(`[PROXY] Deducted ${cost} points, new balance: ${newBalance} points`);
+    
     await redis.set(idempotencyKey, JSON.stringify({ 
       success: true, 
       pending: true,
@@ -357,7 +366,7 @@ router.use(async (req, res, next) => {
         await User.decrement('balance', { by: cost, where: { id: user.id } });
         await endpoint.increment('usageCount');
         
-        console.log(`[PROXY] ${req.method} ${req.path} -> ${targetUrl} [${response.status}] ${latency}ms cost=${cost}`);
+        console.log(`[PROXY] Invocation saved: ${invocationId}, cost=${cost} points, user=${user.id}`);
       } catch (err) {
         console.error('[PROXY] Failed to save invocation:', err.message);
       }

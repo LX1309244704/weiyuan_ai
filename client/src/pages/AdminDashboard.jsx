@@ -10,7 +10,7 @@ import {
   Edit2, Trash2, Eye, RefreshCw, Award, CheckCircle, XCircle,
   Wallet, CreditCard, Shield, TrendingUp, Zap, Clock,
   Copy, Server, X, AlertCircle, Download, Upload, Check, Code,
-  ArrowLeft, LogOut
+  ArrowLeft, LogOut, Play, ToggleLeft, ToggleRight
 } from 'lucide-react'
 
 const menuItems = [
@@ -1193,10 +1193,10 @@ function SearchInput({ value, onChange, placeholder, ...props }) {
   )
 }
 
-function Modal({ title, onClose, children }) {
+function Modal({ title, onClose, children, maxWidth = '480px' }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.5)' }} onClick={onClose}>
-      <div style={{ background: 'white', borderRadius: '12px', width: '100%', maxWidth: '480px', maxHeight: '90vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: 'white', borderRadius: '12px', width: '100%', maxWidth, maxHeight: '90vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
         <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>{title}</h3>
           <button onClick={onClose} style={{ padding: '0.25rem', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}><X size={20} /></button>
@@ -1300,7 +1300,11 @@ function EndpointsTab() {
   const [endpoints, setEndpoints] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [showTestModal, setShowTestModal] = useState(false)
+  const [showLogsModal, setShowLogsModal] = useState(false)
   const [editEndpoint, setEditEndpoint] = useState(null)
+  const [testingEndpoint, setTestingEndpoint] = useState(null)
+  const [logsEndpoint, setLogsEndpoint] = useState(null)
   const [search, setSearch] = useState('')
   
   useEffect(() => { fetchEndpoints() }, [])
@@ -1379,7 +1383,7 @@ function EndpointsTab() {
                 key: 'price', 
                 title: '价格',
                 align: 'right',
-                render: r => <span style={{ fontWeight: 500, color: '#6366f1' }}>¥{(r.pricePerCall / 100).toFixed(2)}</span>
+                render: r => <span style={{ fontWeight: 500, color: '#6366f1' }}>{r.pricePerCall} 积分</span>
               },
               { 
                 key: 'status', 
@@ -1397,6 +1401,8 @@ function EndpointsTab() {
                 align: 'right',
                 render: r => (
                   <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                    <button onClick={() => { setTestingEndpoint(r); setShowTestModal(true); }} className="btn-icon" title="测试" style={{ color: '#22c55e' }}><Play size={16} /></button>
+                    <button onClick={() => { setLogsEndpoint(r); setShowLogsModal(true); }} className="btn-icon" title="日志" style={{ color: '#8b5cf6' }}><Code size={16} /></button>
                     <button onClick={() => { setEditEndpoint(r); setShowModal(true); }} className="btn-icon" title="编辑"><Edit2 size={16} /></button>
                     <button onClick={() => handleToggle(r)} className="btn-icon" title={r.isActive ? '禁用' : '启用'} style={{ color: r.isActive ? '#f59e0b' : '#22c55e' }}>
                       {r.isActive ? <XCircle size={16} /> : <CheckCircle size={16} />}
@@ -1419,6 +1425,20 @@ function EndpointsTab() {
           onSave={() => { setShowModal(false); fetchEndpoints(); }}
         />
       )}
+
+      {showTestModal && testingEndpoint && (
+        <TestModal
+          endpoint={testingEndpoint}
+          onClose={() => { setShowTestModal(false); setTestingEndpoint(null); }}
+        />
+      )}
+
+      {showLogsModal && logsEndpoint && (
+        <LogsModal
+          endpoint={logsEndpoint}
+          onClose={() => { setShowLogsModal(false); setLogsEndpoint(null); }}
+        />
+      )}
     </div>
   )
 }
@@ -1433,57 +1453,113 @@ function EndpointModal({ endpoint, onClose, onSave }) {
     pathPrefix: endpoint?.pathPrefix || '',
     authType: endpoint?.authType || 'none',
     authValue: '',
-    pricePerCall: endpoint?.pricePerCall ? endpoint.pricePerCall / 100 : 1,
+    headersMapping: endpoint?.headersMapping || {},
+    requestExample: endpoint?.requestExample || '',
+    responseExample: endpoint?.responseExample || '',
+    pricePerCall: endpoint?.pricePerCall ?? 1,
     rateLimit: endpoint?.rateLimit || 60,
     timeout: endpoint?.timeout || 30000,
-    isActive: endpoint?.isActive ?? true
+    isActive: endpoint?.isActive ?? true,
+    type: endpoint?.type || 'api',
+    icon: endpoint?.icon || '',
+    defaultParams: endpoint?.defaultParams ? JSON.stringify(endpoint.defaultParams, null, 2) : '{\n  \n}',
+    outputFields: endpoint?.outputFields ? JSON.stringify(endpoint.outputFields, null, 2) : '{\n  \n}',
+    isGenerateTool: endpoint?.isGenerateTool ?? false
   })
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-  
+  const [showAuthValue, setShowAuthValue] = useState(false)
+  const [headerKey, setHeaderKey] = useState('')
+  const [headerValue, setHeaderValue] = useState('')
+  const [headerError, setHeaderError] = useState('')
+
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!form.name.trim() || !form.targetUrl.trim() || !form.pathPrefix.trim()) {
-      setError('请填写必填项')
-      return
-    }
     setSaving(true)
-    setError('')
+
     try {
-      const data = { ...form, pricePerCall: Math.round(form.pricePerCall * 100) }
+      let parsedDefaultParams = {}
+      let parsedOutputFields = {}
       
+      try {
+        parsedDefaultParams = form.defaultParams ? JSON.parse(form.defaultParams) : {}
+      } catch {
+        alert('默认参数必须是有效的 JSON')
+        setSaving(false)
+        return
+      }
+      
+      try {
+        parsedOutputFields = form.outputFields ? JSON.parse(form.outputFields) : {}
+      } catch {
+        alert('输出字段映射必须是有效的 JSON')
+        setSaving(false)
+        return
+      }
+
+      const data = {
+        ...form,
+        pricePerCall: Math.round(form.pricePerCall),
+        authValue: form.authValue || undefined,
+        defaultParams: parsedDefaultParams,
+        outputFields: parsedOutputFields
+      }
+
       if (endpoint) {
         await api.put(`/admin/endpoints/${endpoint.id}`, data)
       } else {
         await api.post('/admin/endpoints', data)
       }
-      
+
       onSave()
-    } catch (err) {
-      setError(err.response?.data?.error || '保存失败')
+    } catch (error) {
+      alert('保存失败: ' + (error.response?.data?.error || error.message))
     } finally {
       setSaving(false)
     }
   }
-  
+
+  const addHeader = () => {
+    if (headerKey && headerValue) {
+      setForm({
+        ...form,
+        headersMapping: {
+          ...form.headersMapping,
+          [headerKey]: headerValue
+        }
+      })
+      setHeaderKey('')
+      setHeaderValue('')
+      setHeaderError('')
+    } else {
+      setHeaderError('请输入 Header 名称和值')
+    }
+  }
+
+  const removeHeader = (key) => {
+    const newHeaders = { ...form.headersMapping }
+    delete newHeaders[key]
+    setForm({ ...form, headersMapping: newHeaders })
+  }
+
   return (
-    <Modal title={endpoint ? '编辑 API 端点' : '新增 API 端点'} onClose={onClose}>
+    <Modal title={endpoint ? '编辑 API 端点' : '新增 API 端点'} onClose={onClose} maxWidth="800px">
       <form onSubmit={handleSubmit}>
-        {error && <div className="alert-error" style={{ marginBottom: '1rem' }}><AlertCircle size={16} /> {error}</div>}
-        
-        <FormField label="名称" required>
-          <input type="text" className="input" value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="API 名称" />
-        </FormField>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <FormField label="名称" required>
+            <input type="text" className="input" value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="如: RunningHub AI生成" />
+          </FormField>
+          
+          <FormField label="分类">
+            <input type="text" className="input" value={form.category} onChange={e => setForm({...form, category: e.target.value})} placeholder="如: 图像生成" />
+          </FormField>
+        </div>
         
         <FormField label="描述">
-          <textarea className="input" value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="API 功能描述" style={{ minHeight: '60px', resize: 'vertical' }} />
+          <textarea className="input" value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="API功能描述" style={{ minHeight: '60px', resize: 'vertical' }} />
         </FormField>
         
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-          <FormField label="分类">
-            <input type="text" className="input" value={form.category} onChange={e => setForm({...form, category: e.target.value})} placeholder="如：图像生成" />
-          </FormField>
-          <FormField label="HTTP 方法">
+          <FormField label="HTTP方法">
             <select className="input" value={form.method} onChange={e => setForm({...form, method: e.target.value})}>
               <option value="GET">GET</option>
               <option value="POST">POST</option>
@@ -1492,10 +1568,18 @@ function EndpointModal({ endpoint, onClose, onSave }) {
               <option value="PATCH">PATCH</option>
             </select>
           </FormField>
+          
+          <FormField label="端点类型">
+            <select className="input" value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
+              <option value="api">普通API</option>
+              <option value="image">图片生成</option>
+              <option value="video">视频生成</option>
+            </select>
+          </FormField>
         </div>
         
         <FormField label="目标URL" required>
-          <input type="text" className="input" value={form.targetUrl} onChange={e => setForm({...form, targetUrl: e.target.value})} placeholder="https://api.example.com/v1/..." style={{ fontFamily: 'monospace', fontSize: '0.875rem' }} />
+          <input type="text" className="input" value={form.targetUrl} onChange={e => setForm({...form, targetUrl: e.target.value})} placeholder="https://api.example.com/v1/chat/completions" style={{ fontFamily: 'monospace', fontSize: '0.875rem' }} />
         </FormField>
         
         <FormField label="路径前缀" required>
@@ -1514,28 +1598,89 @@ function EndpointModal({ endpoint, onClose, onSave }) {
               <option value="basic">Basic Auth</option>
             </select>
           </FormField>
-          <FormField label="认证值">
-            <input type="password" className="input" value={form.authValue} onChange={e => setForm({...form, authValue: e.target.value})} placeholder={endpoint ? '留空保持不变' : '输入认证值'} disabled={form.authType === 'none'} />
-          </FormField>
+          
+          {form.authType !== 'none' && (
+            <FormField label={form.authType === 'bearer' ? 'Bearer Token' : form.authType === 'api_key' ? 'API Key' : 'Basic Auth (username:password)'}>
+              <div style={{ position: 'relative' }}>
+                <input type={showAuthValue ? 'text' : 'password'} className="input" value={form.authValue} onChange={e => setForm({...form, authValue: e.target.value})} placeholder={endpoint ? '留空保持不变' : '输入认证值'} style={{ paddingRight: '2.5rem' }} />
+                <button type="button" onClick={() => setShowAuthValue(!showAuthValue)} style={{ position: 'absolute', right: '0.5rem', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+                  <Eye size={16} />
+                </button>
+              </div>
+            </FormField>
+          )}
         </div>
         
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
-          <FormField label="单次价格(元)" required>
-            <input type="number" step="0.01" min="0" className="input" value={form.pricePerCall} onChange={e => setForm({...form, pricePerCall: parseFloat(e.target.value) || 0})} />
+          <FormField label="单次价格(积分)" required>
+            <input type="number" step="1" min="0" className="input" value={form.pricePerCall} onChange={e => setForm({...form, pricePerCall: parseInt(e.target.value) || 0})} />
           </FormField>
           <FormField label="限流(次/分钟)">
             <input type="number" min="1" className="input" value={form.rateLimit} onChange={e => setForm({...form, rateLimit: parseInt(e.target.value) || 60})} />
           </FormField>
-          <FormField label="超时">
+          <FormField label="超时(ms)">
             <input type="number" min="1000" className="input" value={form.timeout} onChange={e => setForm({...form, timeout: parseInt(e.target.value) || 30000})} />
           </FormField>
         </div>
         
-        <FormField label="状态">
-          <select className="input" value={form.isActive ? 'true' : 'false'} onChange={e => setForm({...form, isActive: e.target.value === 'true'})}>
-            <option value="true">启用</option>
-            <option value="false">禁用</option>
-          </select>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+          <FormField label="状态">
+            <select className="input" value={form.isActive ? 'true' : 'false'} onChange={e => setForm({...form, isActive: e.target.value === 'true'})}>
+              <option value="true">启用</option>
+              <option value="false">禁用</option>
+            </select>
+          </FormField>
+          
+          <FormField label="图标">
+            <input type="text" className="input" value={form.icon} onChange={e => setForm({...form, icon: e.target.value})} placeholder="如: 🖼️ 或 🎬" />
+          </FormField>
+        </div>
+        
+        <FormField label="">
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+            <input type="checkbox" checked={form.isGenerateTool} onChange={e => setForm({...form, isGenerateTool: e.target.checked})} />
+            <span style={{ fontSize: '0.875rem' }}>是否为AI生成工具</span>
+          </label>
+        </FormField>
+        
+        <FormField label="请求示例">
+          <textarea className="input" value={form.requestExample} onChange={e => setForm({...form, requestExample: e.target.value})} placeholder='{"key": "value"} - 请求参数的示例' style={{ fontFamily: 'monospace', fontSize: '0.75rem', minHeight: '80px' }} />
+        </FormField>
+        
+        <FormField label="响应示例">
+          <textarea className="input" value={form.responseExample} onChange={e => setForm({...form, responseExample: e.target.value})} placeholder='{"taskId": "xxx", "status": "SUCCESS"} - 响应格式的示例' style={{ fontFamily: 'monospace', fontSize: '0.75rem', minHeight: '80px' }} />
+        </FormField>
+        
+        {form.isGenerateTool && (
+          <>
+            <FormField label="默认参数 (JSON)">
+              <textarea className="input" value={form.defaultParams} onChange={e => setForm({...form, defaultParams: e.target.value})} placeholder='{"aspectRatio": "1:1", "numImages": 4}' style={{ fontFamily: 'monospace', fontSize: '0.75rem', minHeight: '60px' }} />
+            </FormField>
+            
+            <FormField label="输出字段映射 (JSON)">
+              <textarea className="input" value={form.outputFields} onChange={e => setForm({...form, outputFields: e.target.value})} placeholder='{"result": "data[0].url"}' style={{ fontFamily: 'monospace', fontSize: '0.75rem', minHeight: '60px' }} />
+            </FormField>
+          </>
+        )}
+        
+        <FormField label="自定义请求头">
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <input type="text" className="input" value={headerKey} onChange={e => setHeaderKey(e.target.value)} placeholder="Header名称" style={{ flex: 1 }} />
+            <input type="text" className="input" value={headerValue} onChange={e => setHeaderValue(e.target.value)} placeholder="Header值" style={{ flex: 1 }} />
+            <button type="button" onClick={addHeader} className="btn-outline" style={{ padding: '0.5rem 1rem' }}>添加</button>
+          </div>
+          {headerError && <p style={{ color: '#ef4444', fontSize: '0.75rem', marginBottom: '0.5rem' }}>{headerError}</p>}
+          {Object.keys(form.headersMapping).length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+              {Object.entries(form.headersMapping).map(([key, value]) => (
+                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.25rem 0.5rem', background: '#f8fafc', borderRadius: '4px', fontSize: '0.75rem' }}>
+                  <code style={{ fontFamily: 'monospace' }}>{key}:</code>
+                  <code style={{ fontFamily: 'monospace', color: '#64748b' }}>{value}</code>
+                  <button type="button" onClick={() => removeHeader(key)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', padding: 0 }}><X size={14} /></button>
+                </div>
+              ))}
+            </div>
+          )}
         </FormField>
         
         <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
@@ -1545,6 +1690,264 @@ function EndpointModal({ endpoint, onClose, onSave }) {
           </button>
         </div>
       </form>
+    </Modal>
+  )
+}
+
+function TestModal({ endpoint, onClose }) {
+  const [testBody, setTestBody] = useState('{\n  \n}')
+  const [result, setResult] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [copiedLang, setCopiedLang] = useState('')
+
+  const serverUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'
+  const apiPath = `/api/proxy/${endpoint?.pathPrefix}`
+  
+  const generatePythonCode = () => {
+    const bodyStr = testBody.trim() || '{}'
+    return `import requests
+
+url = "${serverUrl}${apiPath}"
+headers = {
+    "Content-Type": "application/json",
+    "X-API-Key": "YOUR_API_KEY"
+}
+payload = ${bodyStr}
+
+response = requests.post(url, json=payload, headers=headers)
+print(response.status_code)
+print(response.json())`
+  }
+
+  const generateJsCode = () => {
+    const bodyStr = testBody.trim() || '{}'
+    return `const response = await fetch("${serverUrl}${apiPath}", {
+  method: "${endpoint?.method || 'POST'}",
+  headers: {
+    "Content-Type": "application/json",
+    "X-API-Key": "YOUR_API_KEY"
+  },
+  body: JSON.stringify(${bodyStr})
+});
+
+const data = await response.json();
+console.log(response.status);
+console.log(data);`
+  }
+
+  const generateCurlCode = () => {
+    const bodyStr = testBody.trim() ? `-d '${testBody.trim()}'` : ''
+    return `curl -X ${endpoint?.method || 'POST'} "${serverUrl}${apiPath}" \\
+  -H "Content-Type: application/json" \\
+  -H "X-API-Key: YOUR_API_KEY" \\
+  ${bodyStr}`
+  }
+
+  const handleCopy = async (lang) => {
+    let code = ''
+    if (lang === 'python') code = generatePythonCode()
+    else if (lang === 'javascript') code = generateJsCode()
+    else if (lang === 'curl') code = generateCurlCode()
+    
+    await navigator.clipboard.writeText(code)
+    setCopiedLang(lang)
+    setTimeout(() => setCopiedLang(''), 2000)
+  }
+
+  const handleTest = async () => {
+    setLoading(true)
+    setResult(null)
+    try {
+      let body = {}
+      try {
+        body = JSON.parse(testBody)
+      } catch {
+        alert('请输入有效的JSON')
+        setLoading(false)
+        return
+      }
+
+      const response = await api.post(`/admin/endpoints/${endpoint.id}/test`, { testBody: body })
+      setResult(response.data)
+    } catch (error) {
+      setResult({
+        success: false,
+        error: error.response?.data?.error || error.message
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Modal title={`测试 API 端点: ${endpoint?.name}`} onClose={onClose} maxWidth="700px">
+      <div style={{ marginBottom: '1rem' }}>
+        <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.5rem' }}>复制代码</label>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.5rem' }}>
+          <button type="button" onClick={() => handleCopy('python')} className="btn-outline" style={{ background: '#1f2937', color: 'white', borderColor: '#1f2937' }}>
+            {copiedLang === 'python' ? <Check size={16} /> : <Copy size={16} />} Python
+          </button>
+          <button type="button" onClick={() => handleCopy('javascript')} className="btn-outline" style={{ background: '#eab308', color: 'white', borderColor: '#eab308' }}>
+            {copiedLang === 'javascript' ? <Check size={16} /> : <Copy size={16} />} JavaScript
+          </button>
+          <button type="button" onClick={() => handleCopy('curl')} className="btn-outline" style={{ background: '#2563eb', color: 'white', borderColor: '#2563eb' }}>
+            {copiedLang === 'curl' ? <Check size={16} /> : <Copy size={16} />} cURL
+          </button>
+        </div>
+        {copiedLang && <p style={{ fontSize: '0.75rem', color: '#22c55e', marginTop: '0.5rem' }}>已复制到剪贴板</p>}
+      </div>
+
+      <FormField label="请求Body (JSON)">
+        <textarea className="input" value={testBody} onChange={e => setTestBody(e.target.value)} style={{ fontFamily: 'monospace', fontSize: '0.75rem', minHeight: '150px' }} />
+      </FormField>
+
+      <button type="button" onClick={handleTest} disabled={loading} className="btn-primary" style={{ width: '100%', marginBottom: '1rem' }}>
+        <Play size={16} style={{ marginRight: '0.5rem' }} />
+        {loading ? '测试中...' : '发送测试请求'}
+      </button>
+
+      {result && (
+        <div>
+          <label style={{ display: 'block', fontSize: '0.875rem', fontWeight: 500, color: '#374151', marginBottom: '0.5rem' }}>
+            响应结果
+            {result.latency && <span style={{ color: '#64748b', marginLeft: '0.5rem' }}>({result.latency}ms)</span>}
+          </label>
+          <div style={{ 
+            padding: '1rem', 
+            borderRadius: '8px', 
+            fontFamily: 'monospace', 
+            fontSize: '0.75rem', 
+            overflow: 'auto', 
+            maxHeight: '200px',
+            background: result.success ? '#f0fdf4' : '#fef2f2',
+            border: `1px solid ${result.success ? '#bbf7d0' : '#fecaca'}`,
+            color: result.success ? '#166534' : '#991b1b'
+          }}>
+            <pre>{JSON.stringify(result, null, 2)}</pre>
+          </div>
+        </div>
+      )}
+    </Modal>
+  )
+}
+
+function LogsModal({ endpoint, onClose }) {
+  const [logs, setLogs] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [expandedLog, setExpandedLog] = useState(null)
+
+  useEffect(() => {
+    fetchLogs()
+  }, [endpoint.id, page])
+
+  const fetchLogs = async () => {
+    try {
+      const response = await api.get(`/admin/endpoints/${endpoint.id}/logs?page=${page}&limit=20`)
+      setLogs(response.data.logs || [])
+    } catch (error) {
+      console.error('Failed to fetch logs:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const toggleExpand = (logId) => {
+    setExpandedLog(expandedLog === logId ? null : logId)
+  }
+
+  return (
+    <Modal title={`调用日志: ${endpoint?.name}`} onClose={onClose} maxWidth="900px">
+      {loading ? (
+        <LoadingSpinner />
+      ) : logs.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>暂无调用记录</div>
+      ) : (
+        <div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {logs.map(log => (
+              <div key={log.id} style={{ border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+                <div 
+                  style={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between', 
+                    padding: '0.75rem', 
+                    background: '#f8fafc', 
+                    cursor: 'pointer' 
+                  }}
+                  onClick={() => toggleExpand(log.id)}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <code style={{ fontSize: '0.75rem', color: '#64748b' }}>{log.invocationId?.slice(0, 8)}...</code>
+                    <span style={{ 
+                      padding: '0.125rem 0.5rem', 
+                      borderRadius: '4px', 
+                      fontSize: '0.75rem',
+                      background: log.status === 'success' ? '#dcfce7' : log.status === 'timeout' ? '#fef9c3' : '#fee2e2',
+                      color: log.status === 'success' ? '#166534' : log.status === 'timeout' ? '#854d0e' : '#991b1b'
+                    }}>
+                      {log.status === 'success' ? '成功' : log.status === 'timeout' ? '超时' : '失败'}
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>用户: {log.user?.email || log.userId?.slice(0, 8)}...</span>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>耗时: {log.latency}ms</span>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>费用: {log.cost} 积分</span>
+                    {log.responseCode && (
+                      <span style={{ 
+                        padding: '0.125rem 0.5rem', 
+                        borderRadius: '4px', 
+                        fontSize: '0.75rem',
+                        background: log.responseCode < 400 ? '#dbeafe' : '#fee2e2',
+                        color: log.responseCode < 400 ? '#1e40af' : '#991b1b'
+                      }}>
+                        {log.responseCode}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{dayjs(log.created_at).format('YYYY-MM-DD HH:mm:ss')}</span>
+                    <X size={16} style={{ color: '#94a3b8', transform: expandedLog === log.id ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                  </div>
+                </div>
+                
+                {expandedLog === log.id && (
+                  <div style={{ padding: '1rem', background: 'white' }}>
+                    <div style={{ marginBottom: '1rem' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>请求信息</span>
+                        <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{log.request_path}</span>
+                      </div>
+                      <div style={{ padding: '0.75rem', background: '#1f2937', borderRadius: '8px', overflow: 'auto', maxHeight: '150px' }}>
+                        <pre style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: '#4ade80', whiteSpace: 'pre-wrap' }}>{log.request_body || '无'}</pre>
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+                        <span style={{ fontSize: '0.875rem', fontWeight: 500, color: '#374151' }}>响应信息</span>
+                        {log.error_message && (
+                          <span style={{ fontSize: '0.75rem', color: '#ef4444' }}>{log.error_message}</span>
+                        )}
+                      </div>
+                      <div style={{ padding: '0.75rem', background: '#1f2937', borderRadius: '8px', overflow: 'auto', maxHeight: '150px' }}>
+                        <pre style={{ fontSize: '0.75rem', fontFamily: 'monospace', color: '#60a5fa', whiteSpace: 'pre-wrap' }}>{log.response_body || '无'}</pre>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          
+          {logs.length > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'center', gap: '0.5rem', marginTop: '1rem' }}>
+              <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn-outline" style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem' }}>上一页</button>
+              <span style={{ padding: '0.25rem 0.75rem', fontSize: '0.875rem', color: '#64748b' }}>第 {page} 页</span>
+              <button onClick={() => setPage(p => p + 1)} disabled={logs.length < 20} className="btn-outline" style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem' }}>下一页</button>
+            </div>
+          )}
+        </div>
+      )}
     </Modal>
   )
 }

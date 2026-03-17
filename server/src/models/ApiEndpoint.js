@@ -104,7 +104,12 @@ module.exports = (sequelize, DataTypes) => {
     isGenerateTool: {
       type: DataTypes.BOOLEAN,
       defaultValue: false,
-      comment: '是否为AI生成工具'
+      comment: '是否显示高级参数配置'
+    },
+    showInGenerate: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+      comment: '是否在AI创作页面显示'
     },
     createdBy: {
       type: DataTypes.UUID,

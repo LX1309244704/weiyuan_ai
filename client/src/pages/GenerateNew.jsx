@@ -11,13 +11,14 @@ import PreviewArea from '../components/generate/PreviewArea'
 import { Zap, Loader2, Sparkles } from 'lucide-react'
 import '../styles/generate.css'
 
-const MODELS = [
+const DEFAULT_MODELS = [
   { 
     id: 'image-v3', 
     name: '图片 3.0', 
     description: '强化一致性，自由多参考图，全面效果升级',
     type: 'image',
     icon: '🖼️',
+    isBuiltIn: true,
     defaultParams: {
       resolution: '2K',
       aspectRatio: '3:4',
@@ -30,6 +31,7 @@ const MODELS = [
     description: '经典图片生成模型',
     type: 'image',
     icon: '🖼️',
+    isBuiltIn: true,
     defaultParams: {
       resolution: '1080P',
       aspectRatio: '1:1',
@@ -42,6 +44,7 @@ const MODELS = [
     description: '高质量视频生成',
     type: 'video',
     icon: '🎬',
+    isBuiltIn: true,
     defaultParams: {
       resolution: '1080P',
       duration: 5,
@@ -54,10 +57,11 @@ export default function GenerateNew() {
   const navigate = useNavigate()
   const { user, isAuthenticated } = useAuthStore()
   
-  const [selectedModel, setSelectedModel] = useState(MODELS[0])
+  const [models, setModels] = useState(DEFAULT_MODELS)
+  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODELS[0])
   const [prompt, setPrompt] = useState('')
   const [referenceImages, setReferenceImages] = useState([])
-  const [params, setParams] = useState(MODELS[0].defaultParams)
+  const [params, setParams] = useState(DEFAULT_MODELS[0].defaultParams)
   
   const [generating, setGenerating] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -66,21 +70,84 @@ export default function GenerateNew() {
   const [error, setError] = useState(null)
   
   const [tools, setTools] = useState([])
-  const [selectedTool, setSelectedTool] = useState(null)
+  const [selectedTool, setSelectedTool] = useState([])
+  const [userApiKey, setUserApiKey] = useState('')
   
   useEffect(() => {
+    fetchApiEndpoints()
     fetchTools()
+    if (isAuthenticated) {
+      fetchUserApiKey()
+    }
   }, [])
+  
+  const fetchUserApiKey = async () => {
+    try {
+      const res = await api.get('/users/me')
+      if (res.data.user?.apiKey) {
+        setUserApiKey(res.data.user.apiKey)
+      }
+    } catch (err) {
+      console.error('Failed to fetch user API key:', err)
+    }
+  }
+  
+  const fetchApiEndpoints = async () => {
+    try {
+      const response = await api.get('/proxy/endpoints?showInGenerate=1')
+      console.log('API Endpoints response:', response.data)
+      const endpoints = response.data.endpoints || []
+      console.log('Endpoints:', endpoints)
+      
+      if (endpoints.length > 0) {
+        console.log('Endpoints received:', endpoints)
+        const endpointModels = endpoints.map(ep => ({
+          id: `endpoint-${ep.id}`,
+          name: ep.name,
+          description: ep.description || `${ep.type} 类型 API`,
+          type: ep.type || 'api',
+          icon: ep.icon || '🔗',
+          isBuiltIn: false,
+          endpointId: ep.id,
+          pathPrefix: ep.pathPrefix,
+          defaultParams: ep.defaultParams || {},
+          customParams: ep.defaultParams || {},
+          pricePerCall: ep.pricePerCall
+        }))
+        
+        console.log('Endpoint models with customParams:', endpointModels)
+        setModels([...DEFAULT_MODELS, ...endpointModels])
+      }
+    } catch (err) {
+      console.error('Failed to fetch API endpoints:', err)
+    }
+  }
   
   useEffect(() => {
     if (selectedModel) {
-      setParams(selectedModel.defaultParams || {})
+      if (!selectedModel.isBuiltIn && selectedModel.customParams) {
+        const customParams = selectedModel.customParams
+        const initialParams = {}
+        Object.entries(customParams).forEach(([key, config]) => {
+          initialParams[key] = config.value
+        })
+        setParams(initialParams)
+      } else {
+        setParams(selectedModel.defaultParams || {})
+      }
+      
+      if (!selectedModel.isBuiltIn) {
+        setTools([])
+        setSelectedTool(null)
+      } else {
+        fetchTools(selectedModel.type)
+      }
     }
   }, [selectedModel])
   
-  const fetchTools = async () => {
+  const fetchTools = async (type) => {
+    if (!type) return
     try {
-      const type = selectedModel?.type || 'image'
       const response = await api.get(`/generate/tools?type=${type}`)
       const toolsList = response.data.tools || []
       setTools(toolsList)
@@ -105,9 +172,18 @@ export default function GenerateNew() {
       return
     }
     
-    if (!selectedTool) {
-      alert('请选择生成工具')
-      return
+    const isApiEndpoint = !selectedModel?.isBuiltIn
+    
+    if (isApiEndpoint) {
+      if (!selectedModel?.endpointId) {
+        alert('请选择模型')
+        return
+      }
+    } else {
+      if (!selectedTool) {
+        alert('请选择生成工具')
+        return
+      }
     }
     
     setGenerating(true)
@@ -132,45 +208,105 @@ export default function GenerateNew() {
     }, 500)
     
     try {
-      const imageUrls = referenceImages.map(img => img.url)
+      let response
       
-      const response = await api.post('/generate/generate', {
-        toolId: selectedTool.id,
-        prompt: prompt.trim(),
-        imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
-        parameters: params
-      })
+      const isApiEndpoint = !selectedModel?.isBuiltIn
+      
+      if (isApiEndpoint) {
+        console.log('Calling API endpoint:', selectedModel.pathPrefix)
+        console.log('Request params:', params)
+        
+        const requestBody = {
+          prompt: prompt.trim(),
+          ...params
+        }
+        
+        if (referenceImages.length > 0) {
+          requestBody.imageUrls = referenceImages.map(img => img.url)
+        }
+        
+        console.log('Request body:', requestBody)
+        
+        response = await api.post(`/proxy/${selectedModel.pathPrefix}`, requestBody, {
+          headers: userApiKey ? { 'X-API-Key': userApiKey } : {}
+        })
+        console.log('API response:', response.data)
+      } else {
+        const imageUrls = referenceImages.map(img => img.url)
+        
+        response = await api.post('/generate/generate', {
+          toolId: selectedTool.id,
+          prompt: prompt.trim(),
+          imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
+          parameters: params
+        })
+      }
       
       clearInterval(progressInterval)
       clearInterval(timeInterval)
       
-      if (response.data.success) {
-        setProgress(100)
-        
-        const resultUrls = []
-        if (response.data.result?.result) {
-          if (Array.isArray(response.data.result.result)) {
-            resultUrls.push(...response.data.result.result.map(url => ({ url })))
-          } else {
-            resultUrls.push({ url: response.data.result.result })
+      let hasResult = false
+      
+      if (isApiEndpoint) {
+        if (response.data.success || response.status === 200) {
+          setProgress(100)
+          
+          const resultUrls = []
+          
+          if (response.data.data) {
+            if (Array.isArray(response.data.data)) {
+              resultUrls.push(...response.data.data.map(url => ({ url })))
+            } else if (typeof response.data.data === 'string') {
+              resultUrls.push({ url: response.data.data })
+            } else if (response.data.data.url) {
+              resultUrls.push({ url: response.data.data.url })
+            } else if (response.data.data.result) {
+              if (Array.isArray(response.data.data.result)) {
+                resultUrls.push(...response.data.data.result.map(url => ({ url })))
+              } else {
+                resultUrls.push({ url: response.data.data.result })
+              }
+            }
+          }
+          
+          if (resultUrls.length > 0) {
+            setResults(resultUrls)
+            hasResult = true
           }
         }
         
-        if (response.data.data?.images && Array.isArray(response.data.data.images)) {
-          resultUrls.push(...response.data.data.images.map(url => ({ url })))
-        }
-        
-        if (resultUrls.length === 0 && response.data.data?.url) {
-          resultUrls.push({ url: response.data.data.url })
-        }
-        
-        if (resultUrls.length > 0) {
-          setResults(resultUrls)
-        } else {
-          setError('生成成功，但未返回结果')
+        if (!hasResult) {
+          setError(response.data.error || '生成失败')
         }
       } else {
-        setError(response.data.error || '生成失败')
+        if (response.data.success) {
+          setProgress(100)
+          
+          const resultUrls = []
+          if (response.data.result?.result) {
+            if (Array.isArray(response.data.result.result)) {
+              resultUrls.push(...response.data.result.result.map(url => ({ url })))
+            } else {
+              resultUrls.push({ url: response.data.result.result })
+            }
+          }
+          
+          if (response.data.data?.images && Array.isArray(response.data.data.images)) {
+            resultUrls.push(...response.data.data.images.map(url => ({ url })))
+          }
+          
+          if (resultUrls.length === 0 && response.data.data?.url) {
+            resultUrls.push({ url: response.data.data.url })
+          }
+          
+          if (resultUrls.length > 0) {
+            setResults(resultUrls)
+          } else {
+            setError('生成成功，但未返回结果')
+          }
+        } else {
+          setError(response.data.error || '生成失败')
+        }
       }
     } catch (err) {
       setError(err.response?.data?.error || err.message)
@@ -180,7 +316,7 @@ export default function GenerateNew() {
       setGenerating(false)
       setEstimatedTime(null)
     }
-  }, [isAuthenticated, prompt, selectedTool, params, referenceImages, selectedModel])
+  }, [isAuthenticated, prompt, selectedTool, selectedModel, params, referenceImages])
   
   const handleDownload = async (url) => {
     const link = document.createElement('a')
@@ -227,7 +363,7 @@ export default function GenerateNew() {
           margin: '0 auto 0 2rem'
         }}>
           <ModelSelector
-            models={MODELS}
+            models={models}
             selectedModel={selectedModel}
             onSelect={setSelectedModel}
           />
@@ -246,6 +382,7 @@ export default function GenerateNew() {
             modelType={modelType}
             params={params}
             onChange={setParams}
+            customParams={!selectedModel?.isBuiltIn ? selectedModel?.customParams : null}
           />
           
           <div style={{ marginTop: '1rem' }}>

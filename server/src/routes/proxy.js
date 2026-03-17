@@ -10,16 +10,19 @@ const PROXY_RATE_LIMIT_WINDOW = 60;
 
 router.get('/endpoints', async (req, res, next) => {
   try {
-    const { category } = req.query;
+    const { category, showInGenerate } = req.query;
     
     const where = { isActive: true };
     if (category) {
       where.category = category;
     }
+    if (showInGenerate === '1' || showInGenerate === 'true') {
+      where.showInGenerate = true;
+    }
 
     const endpoints = await ApiEndpoint.findAll({
       where,
-      attributes: ['id', 'name', 'description', 'category', 'pathPrefix', 'method', 'pricePerCall', 'rateLimit', 'requestExample', 'responseExample'],
+      attributes: ['id', 'name', 'description', 'category', 'pathPrefix', 'method', 'pricePerCall', 'rateLimit', 'requestExample', 'responseExample', 'type', 'icon', 'defaultParams', 'outputFields', 'showInGenerate'],
       order: [['name', 'ASC']]
     });
 
@@ -30,12 +33,18 @@ router.get('/endpoints', async (req, res, next) => {
         name: ep.name,
         description: ep.description,
         category: ep.category,
+        pathPrefix: ep.pathPrefix,
         path: `/api/proxy/${ep.pathPrefix}`,
         method: ep.method,
+        type: ep.type,
+        icon: ep.icon,
         pricePerCall: ep.pricePerCall,
         rateLimit: ep.rateLimit,
         requestExample: ep.requestExample,
-        responseExample: ep.responseExample
+        responseExample: ep.responseExample,
+        defaultParams: ep.defaultParams,
+        outputFields: ep.outputFields,
+        showInGenerate: ep.showInGenerate
       }))
     });
   } catch (error) {
@@ -153,6 +162,62 @@ function buildTargetHeaders(endpoint, userHeaders) {
   return headers;
 }
 
+function transformRequestBody(requestExample, clientBody) {
+  if (!requestExample) {
+    return clientBody;
+  }
+
+  try {
+    const example = typeof requestExample === 'string' 
+      ? JSON.parse(requestExample) 
+      : requestExample;
+
+    const prompt = clientBody.prompt || '';
+    const params = { ...clientBody };
+    delete params.prompt;
+
+    let transformed = typeof example === 'string' ? example : JSON.stringify(example);
+
+    transformed = transformed.replace(/\$\{prompt\}/g, prompt)
+      .replace(/\$\{prompt\.text\}/g, prompt)
+      .replace(/\$\{text\}/g, prompt);
+    
+    for (const [key, value] of Object.entries(params)) {
+      const placeholder = `\${${key}}`;
+      if (transformed.includes(placeholder)) {
+        transformed = transformed.replace(placeholder, String(value));
+      }
+      if (typeof value === 'string' && transformed.includes(`\${${key}.text}`)) {
+        transformed = transformed.replace(`\${${key}.text}`, value);
+      }
+    }
+
+    if (transformed.includes('${') && transformed.includes('}')) {
+      const dynamicKeys = transformed.match(/\$\{([^}]+)\}/g) || [];
+      for (const key of dynamicKeys) {
+        const field = key.slice(2, -1);
+        if (clientBody[field] !== undefined) {
+          transformed = transformed.replace(key, JSON.stringify(clientBody[field]));
+        } else if (field.includes('.')) {
+          const parts = field.split('.');
+          let val = clientBody;
+          for (const part of parts) {
+            val = val?.[part];
+          }
+          if (val !== undefined) {
+            transformed = transformed.replace(key, JSON.stringify(val));
+          }
+        }
+      }
+    }
+
+    return JSON.parse(transformed);
+  } catch (e) {
+    console.error('[PROXY] Failed to transform request body:', e.message);
+    return clientBody;
+  }
+}
+
 router.use(async (req, res, next) => {
   const startTime = Date.now();
   let invocationRecord = null;
@@ -184,6 +249,7 @@ router.use(async (req, res, next) => {
     }
 
     const pathParts = req.path.split('/').filter(Boolean);
+    console.log('[PROXY] Request path:', req.path, 'pathParts:', pathParts);
     if (pathParts.length === 0) {
       return res.status(400).json({ 
         success: false,
@@ -281,13 +347,17 @@ router.use(async (req, res, next) => {
 
     const targetHeaders = buildTargetHeaders(endpoint, req.headers);
 
+    const transformedBody = transformRequestBody(endpoint.requestExample, req.body);
+    console.log('[PROXY] Original body:', req.body);
+    console.log('[PROXY] Transformed body:', transformedBody);
+
     let response;
     try {
       const axiosConfig = {
         method: req.method,
         url: targetUrl,
         headers: targetHeaders,
-        data: req.body,
+        data: transformedBody,
         timeout: endpoint.timeout || 30000,
         validateStatus: () => true,
         maxBodyLength: 50 * 1024 * 1024,
@@ -346,11 +416,13 @@ router.use(async (req, res, next) => {
       responseBodyStr = String(response.data);
     }
 
+    const isUpstreamError = response.status >= 400;
+    
     invocationRecord = {
       invocationId,
       endpointId: endpoint.id,
       userId: user.id,
-      cost,
+      cost: isUpstreamError ? 0 : cost,
       status: response.status < 400 ? 'success' : 'failed',
       latency,
       ipAddress: req.ip || req.connection.remoteAddress,
@@ -359,6 +431,11 @@ router.use(async (req, res, next) => {
       requestBody: requestBodyStr,
       responseBody: responseBodyStr
     };
+
+    if (isUpstreamError) {
+      await redis.incrby(balanceKey, cost);
+      console.log(`[PROXY] Upstream API error, refunded ${cost} points, response: ${response.status}`);
+    }
 
     setImmediate(async () => {
       try {

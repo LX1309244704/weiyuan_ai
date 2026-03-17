@@ -952,7 +952,8 @@ router.post('/endpoints', requireAdmin, async (req, res, next) => {
       icon,
       defaultParams,
       outputFields,
-      isGenerateTool = false
+      isGenerateTool = false,
+      showInGenerate = false
     } = req.body;
     
     if (!name || !targetUrl || !pathPrefix) {
@@ -990,6 +991,7 @@ router.post('/endpoints', requireAdmin, async (req, res, next) => {
       defaultParams: defaultParams || {},
       outputFields: outputFields || {},
       isGenerateTool,
+      showInGenerate,
       createdBy: req.user.id
     });
     
@@ -1033,7 +1035,8 @@ router.put('/endpoints/:id', requireAdmin, async (req, res, next) => {
       icon,
       defaultParams,
       outputFields,
-      isGenerateTool
+      isGenerateTool,
+      showInGenerate
     } = req.body;
     
     const endpoint = await ApiEndpoint.findByPk(id);
@@ -1078,7 +1081,8 @@ router.put('/endpoints/:id', requireAdmin, async (req, res, next) => {
       icon: icon !== undefined ? icon : endpoint.icon,
       defaultParams: defaultParams !== undefined ? defaultParams : endpoint.defaultParams,
       outputFields: outputFields !== undefined ? outputFields : endpoint.outputFields,
-      isGenerateTool: isGenerateTool !== undefined ? isGenerateTool : endpoint.isGenerateTool
+      isGenerateTool: isGenerateTool !== undefined ? isGenerateTool : endpoint.isGenerateTool,
+      showInGenerate: showInGenerate !== undefined ? showInGenerate : endpoint.showInGenerate
     });
     
     await redis.del(`endpoint:${id}`);

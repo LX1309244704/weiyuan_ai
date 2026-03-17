@@ -1332,6 +1332,13 @@ function EndpointsTab() {
     } catch (e) { alert('操作失败') }
   }
   
+  const handleToggleShowInGenerate = async (endpoint) => {
+    try {
+      await api.put(`/admin/endpoints/${endpoint.id}`, { showInGenerate: !endpoint.showInGenerate })
+      fetchEndpoints()
+    } catch (e) { alert('操作失败') }
+  }
+  
   const filtered = endpoints.filter(e => 
     e.name?.toLowerCase().includes(search.toLowerCase()) ||
     e.category?.toLowerCase().includes(search.toLowerCase()) ||
@@ -1392,6 +1399,20 @@ function EndpointsTab() {
                   <span className={`badge ${r.isActive ? 'badge-success' : 'badge-default'}`}>
                     {r.isActive ? '启用' : '禁用'}
                   </span>
+                )
+              },
+              { 
+                key: 'showInGenerate', 
+                title: '创作页',
+                render: r => (
+                  <button 
+                    onClick={() => handleToggleShowInGenerate(r)}
+                    className="btn-icon" 
+                    title={r.showInGenerate ? '在创作页隐藏' : '在创作页显示'}
+                    style={{ color: r.showInGenerate ? '#22c55e' : '#94a3b8' }}
+                  >
+                    {r.showInGenerate ? <CheckCircle size={16} /> : <XCircle size={16} />}
+                  </button>
                 )
               },
               { key: 'usage', title: '调用次数', align: 'right', render: r => r.usageCount || 0 },
@@ -1462,9 +1483,9 @@ function EndpointModal({ endpoint, onClose, onSave }) {
     isActive: endpoint?.isActive ?? true,
     type: endpoint?.type || 'api',
     icon: endpoint?.icon || '',
-    defaultParams: endpoint?.defaultParams ? JSON.stringify(endpoint.defaultParams, null, 2) : '{\n  \n}',
-    outputFields: endpoint?.outputFields ? JSON.stringify(endpoint.outputFields, null, 2) : '{\n  \n}',
-    isGenerateTool: endpoint?.isGenerateTool ?? false
+    defaultParams: endpoint?.defaultParams ? JSON.stringify(endpoint.defaultParams, null, 2) : '{\n  "aspectRatio": {"label": "画面比例", "value": "4:3", "options": [\n    { "value": "1:1", "label": "1:1" },\n    { "value": "4:3", "label": "4:3" },\n    { "value": "16:9", "label": "16:9" },\n    { "value": "3:4", "label": "3:4" },\n    { "value": "9:16", "label": "9:16" }\n  ]},\n  "imageSize": {"label": "分辨率", "value": "1K", "options": [\n    { "value": "1K", "label": "1K" },\n    { "value": "2K", "label": "2K" },\n    { "value": "4K", "label": "4K" }\n  ]},\n  "batchSize": {"label": "生成数量", "value": 1, "options": [\n    { "value": 1, "label": "1x" },\n    { "value": 2, "label": "2x" },\n    { "value": 4, "label": "4x" }\n  ]}\n}',
+    outputFields: endpoint?.outputFields ? JSON.stringify(endpoint.outputFields, null, 2) : '{\n  "result": "data.images[0].url",\n  "taskId": "task_id",\n  "status": "status"\n}',
+    showInGenerate: endpoint?.showInGenerate ?? false
   })
   const [saving, setSaving] = useState(false)
   const [showAuthValue, setShowAuthValue] = useState(false)
@@ -1638,10 +1659,22 @@ function EndpointModal({ endpoint, onClose, onSave }) {
         
         <FormField label="">
           <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
-            <input type="checkbox" checked={form.isGenerateTool} onChange={e => setForm({...form, isGenerateTool: e.target.checked})} />
-            <span style={{ fontSize: '0.875rem' }}>是否为AI生成工具</span>
+            <input type="checkbox" checked={form.showInGenerate} onChange={e => setForm({...form, showInGenerate: e.target.checked})} />
+            <span style={{ fontSize: '0.875rem' }}>在AI创作页面显示为模型选项</span>
           </label>
         </FormField>
+        
+        {form.showInGenerate && (
+          <>
+            <FormField label="请求默认参数 (JSON)">
+              <textarea className="input" value={form.defaultParams} onChange={e => setForm({...form, defaultParams: e.target.value})} placeholder='{"aspectRatio": "1:1", "numImages": 4, "style": "realistic"}' style={{ fontFamily: 'monospace', fontSize: '0.75rem', minHeight: '80px' }} />
+            </FormField>
+            
+            <FormField label="响应字段映射 (JSON)">
+              <textarea className="input" value={form.outputFields} onChange={e => setForm({...form, outputFields: e.target.value})} placeholder='{"result": "data.images[0].url", "taskId": "task_id"}' style={{ fontFamily: 'monospace', fontSize: '0.75rem', minHeight: '80px' }} />
+            </FormField>
+          </>
+        )}
         
         <FormField label="请求示例">
           <textarea className="input" value={form.requestExample} onChange={e => setForm({...form, requestExample: e.target.value})} placeholder='{"key": "value"} - 请求参数的示例' style={{ fontFamily: 'monospace', fontSize: '0.75rem', minHeight: '80px' }} />
@@ -1650,18 +1683,6 @@ function EndpointModal({ endpoint, onClose, onSave }) {
         <FormField label="响应示例">
           <textarea className="input" value={form.responseExample} onChange={e => setForm({...form, responseExample: e.target.value})} placeholder='{"taskId": "xxx", "status": "SUCCESS"} - 响应格式的示例' style={{ fontFamily: 'monospace', fontSize: '0.75rem', minHeight: '80px' }} />
         </FormField>
-        
-        {form.isGenerateTool && (
-          <>
-            <FormField label="默认参数 (JSON)">
-              <textarea className="input" value={form.defaultParams} onChange={e => setForm({...form, defaultParams: e.target.value})} placeholder='{"aspectRatio": "1:1", "numImages": 4}' style={{ fontFamily: 'monospace', fontSize: '0.75rem', minHeight: '60px' }} />
-            </FormField>
-            
-            <FormField label="输出字段映射 (JSON)">
-              <textarea className="input" value={form.outputFields} onChange={e => setForm({...form, outputFields: e.target.value})} placeholder='{"result": "data[0].url"}' style={{ fontFamily: 'monospace', fontSize: '0.75rem', minHeight: '60px' }} />
-            </FormField>
-          </>
-        )}
         
         <FormField label="自定义请求头">
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>

@@ -9,7 +9,8 @@ import {
   Home, Package, Search, Plus,
   Edit2, Trash2, Eye, RefreshCw, Award, CheckCircle, XCircle,
   Wallet, CreditCard, Shield, TrendingUp, Zap, Clock,
-  Copy, Server, X, AlertCircle, Download, Upload, Check, Code
+  Copy, Server, X, AlertCircle, Download, Upload, Check, Code,
+  ArrowLeft, LogOut
 } from 'lucide-react'
 
 const menuItems = [
@@ -128,7 +129,56 @@ export default function AdminDashboard() {
           </nav>
           
           {/* Actions */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button
+              onClick={() => navigate('/')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.375rem',
+                padding: '0.5rem 0.75rem',
+                background: '#22c55e',
+                border: 'none',
+                borderRadius: '6px',
+                color: '#000',
+                fontSize: '0.8125rem',
+                fontWeight: 500,
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => e.target.style.opacity = '0.9'}
+              onMouseLeave={(e) => e.target.style.opacity = '1'}
+            >
+              <ArrowLeft size={14} />
+              返回用户端
+            </button>
+            <button
+              onClick={() => logout() && navigate('/login')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.375rem',
+                padding: '0.5rem 0.75rem',
+                background: 'transparent',
+                border: '1px solid #e2e8f0',
+                borderRadius: '6px',
+                color: '#64748b',
+                fontSize: '0.8125rem',
+                cursor: 'pointer',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.borderColor = '#ef4444'
+                e.target.style.color = '#ef4444'
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.borderColor = '#e2e8f0'
+                e.target.style.color = '#64748b'
+              }}
+            >
+              <LogOut size={14} />
+              退出
+            </button>
           </div>
         </div>
       </header>

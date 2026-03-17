@@ -1,5 +1,4 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { 
   LayoutDashboard, 
   Wrench, 
@@ -10,7 +9,13 @@ import {
   LogOut,
   Home,
   Code,
-  ChevronRight
+  ChevronRight,
+  Sparkles,
+  Package,
+  Plug,
+  FileText,
+  UserCircle2,
+  ArrowLeft
 } from 'lucide-react'
 import TopNavigationBar from '../TopNavigationBar'
 import '../../styles/generate.css'
@@ -25,7 +30,16 @@ const menuItems = [
   { key: 'settings', label: '系统设置', icon: Settings },
 ]
 
+const mainMenuItems = [
+  { label: 'AI创作', path: '/generate', icon: Sparkles },
+  { label: '生成记录', path: '/generate/history', icon: FileText },
+  { label: '技能', path: '/', icon: Package },
+  { label: 'API', path: '/api-market', icon: Plug },
+  { label: '个人中心', path: '/profile', icon: UserCircle2 }
+]
+
 export default function AdminLayout({ children, activeTab, onTabChange, user, onLogout }) {
+  const navigate = useNavigate()
   const currentItem = menuItems.find(item => item.key === activeTab)
   
   return (
@@ -77,6 +91,51 @@ export default function AdminLayout({ children, activeTab, onTabChange, user, on
           </div>
           
           <nav style={{ padding: '0.5rem', flex: 1 }}>
+            {/* 主站菜单 */}
+            <div style={{ padding: '0.5rem 0.75rem', marginBottom: '0.5rem' }}>
+              <p style={{ fontSize: '0.75rem', color: 'var(--ai-text-muted)', fontWeight: 600, marginBottom: '0.5rem' }}>主站</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                {mainMenuItems.map((item, index) => {
+                  const Icon = item.icon
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => navigate(item.path)}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        padding: '0.5rem 0.625rem',
+                        borderRadius: '6px',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontSize: '0.8125rem',
+                        fontWeight: 500,
+                        background: 'transparent',
+                        color: 'var(--ai-text-secondary)',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.target.style.backgroundColor = 'var(--ai-bg-hover)'
+                        e.target.style.color = 'var(--ai-text-primary)'
+                      }}
+                      onMouseLeave={(e) => {
+                        e.target.style.backgroundColor = 'transparent'
+                        e.target.style.color = 'var(--ai-text-secondary)'
+                      }}
+                    >
+                      <Icon size={14} />
+                      {item.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div style={{ borderTop: '1px solid var(--ai-border-color)', margin: '0.5rem 0' }} />
+
+            <p style={{ fontSize: '0.75rem', color: 'var(--ai-text-muted)', fontWeight: 600, padding: '0.5rem 0.75rem' }}>管理</p>
             {menuItems.map(item => {
               const Icon = item.icon
               const isActive = activeTab === item.key
@@ -147,35 +206,65 @@ export default function AdminLayout({ children, activeTab, onTabChange, user, on
                 </p>
               </div>
             </div>
-            <button
-              onClick={onLogout}
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '0.5rem',
-                padding: '0.5rem',
-                fontSize: '0.8125rem',
-                background: 'transparent',
-                border: '1px solid var(--ai-border-color)',
-                borderRadius: '6px',
-                color: 'var(--ai-text-secondary)',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.borderColor = '#ef4444'
-                e.target.style.color = '#ef4444'
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.borderColor = 'var(--ai-border-color)'
-                e.target.style.color = 'var(--ai-text-secondary)'
-              }}
-            >
-              <LogOut size={16} />
-              退出登录
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                onClick={() => navigate('/')}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.375rem',
+                  padding: '0.5rem',
+                  fontSize: '0.8125rem',
+                  background: 'var(--ai-accent-green)',
+                  border: 'none',
+                  borderRadius: '6px',
+                  color: '#000',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  fontWeight: 500
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.opacity = '0.9'
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.opacity = '1'
+                }}
+              >
+                <ArrowLeft size={14} />
+                返回用户端
+              </button>
+              <button
+                onClick={onLogout}
+                style={{
+                  flex: 1,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.375rem',
+                  padding: '0.5rem',
+                  fontSize: '0.8125rem',
+                  background: 'transparent',
+                  border: '1px solid var(--ai-border-color)',
+                  borderRadius: '6px',
+                  color: 'var(--ai-text-secondary)',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.borderColor = '#ef4444'
+                  e.target.style.color = '#ef4444'
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.borderColor = 'var(--ai-border-color)'
+                  e.target.style.color = 'var(--ai-text-secondary)'
+                }}
+              >
+                <LogOut size={16} />
+                退出
+              </button>
+            </div>
           </div>
         </div>
         

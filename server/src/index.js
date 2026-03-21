@@ -82,6 +82,8 @@ app.use('/api/billing', require('./routes/billing'));
 app.use('/api/payment', require('./routes/payment'));
 app.use('/api/proxy', require('./routes/proxy'));
 app.use('/api/generate', require('./routes/generate'));
+app.use('/api/ai-generate', require('./routes/aiGenerate'));
+app.use('/api/coupon', require('./routes/coupon'));
 
 app.use('/api/admin', require('./routes/admin'));
 
@@ -124,12 +126,52 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
+// Run database migrations
+async function runMigrations() {
+  try {
+    const migrations = [
+      { table: 'ai_generate_tasks', column: 'endpoint_id', sql: "ALTER TABLE ai_generate_tasks ADD COLUMN endpoint_id VARCHAR(36)" },
+      { table: 'ai_generate_tasks', column: 'api_key', sql: "ALTER TABLE ai_generate_tasks ADD COLUMN api_key VARCHAR(64)" },
+      { table: 'ai_generate_tasks', column: 'model', sql: "ALTER TABLE ai_generate_tasks ADD COLUMN model VARCHAR(100)" },
+      { table: 'ai_generate_tasks', column: 'refund_amount', sql: "ALTER TABLE ai_generate_tasks ADD COLUMN refund_amount INT DEFAULT 0" },
+      { table: 'ai_generate_tasks', column: 'balance_change_type', sql: "ALTER TABLE ai_generate_tasks ADD COLUMN balance_change_type ENUM('consume', 'refund') DEFAULT 'consume'" },
+      { table: 'ai_generate_tasks', column: 'balance_change_at', sql: "ALTER TABLE ai_generate_tasks ADD COLUMN balance_change_at DATETIME" },
+      { table: 'api_endpoints', column: 'headers_mapping', sql: "ALTER TABLE api_endpoints ADD COLUMN headers_mapping JSON" },
+      { table: 'api_endpoints', column: 'request_example', sql: "ALTER TABLE api_endpoints ADD COLUMN request_example TEXT" },
+      { table: 'api_endpoints', column: 'response_example', sql: "ALTER TABLE api_endpoints ADD COLUMN response_example TEXT" },
+      { table: 'api_endpoints', column: 'is_generate_tool', sql: "ALTER TABLE api_endpoints ADD COLUMN is_generate_tool BOOLEAN DEFAULT FALSE" },
+      { table: 'api_endpoints', column: 'show_in_generate', sql: "ALTER TABLE api_endpoints ADD COLUMN show_in_generate BOOLEAN DEFAULT FALSE" },
+      { table: 'api_endpoints', column: 'default_params', sql: "ALTER TABLE api_endpoints ADD COLUMN default_params JSON" },
+      { table: 'api_endpoints', column: 'output_fields', sql: "ALTER TABLE api_endpoints ADD COLUMN output_fields JSON" },
+    ];
+
+    for (const migration of migrations) {
+      try {
+        await sequelize.query(migration.sql);
+        console.log(`Migration: Added ${migration.column} to ${migration.table}`);
+      } catch (err) {
+        if (err.original && err.original.code === 'ER_DUP_FIELDNAME') {
+          // Column already exists, that's fine
+        } else if (!err.message.includes('Duplicate column name')) {
+          console.log(`Migration skip ${migration.column}: ${err.message}`);
+        }
+      }
+    }
+    console.log('Database migrations completed.');
+  } catch (error) {
+    console.error('Migration error:', error.message);
+  }
+}
+
 // Initialize database and start server
 async function startServer() {
   try {
     // Test database connection
     await sequelize.authenticate();
     console.log('Database connection established successfully.');
+    
+    // Run migrations for ai_generate_tasks table
+    await runMigrations();
     
     // Sync models (use { force: true } to reset tables)
     // Use alter: false to avoid index duplication issues

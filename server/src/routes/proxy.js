@@ -114,6 +114,10 @@ async function checkRateLimit(userId, endpointId, limit) {
 }
 
 function buildTargetHeaders(endpoint, userHeaders) {
+  console.log('[PROXY] buildTargetHeaders - endpoint.authType:', endpoint.authType);
+  console.log('[PROXY] buildTargetHeaders - endpoint.headersMapping:', endpoint.headersMapping);
+  console.log('[PROXY] buildTargetHeaders - userHeaders:', userHeaders);
+  
   const headers = {
     'Content-Type': 'application/json',
     'User-Agent': 'XWOW-AMS-Proxy/1.0'
@@ -163,6 +167,9 @@ function buildTargetHeaders(endpoint, userHeaders) {
 }
 
 function transformRequestBody(requestExample, clientBody) {
+  console.log('[PROXY] transformRequestBody - requestExample:', requestExample);
+  console.log('[PROXY] transformRequestBody - clientBody:', clientBody);
+  
   if (!requestExample) {
     return clientBody;
   }
@@ -348,8 +355,10 @@ router.use(async (req, res, next) => {
     const targetHeaders = buildTargetHeaders(endpoint, req.headers);
 
     const transformedBody = transformRequestBody(endpoint.requestExample, req.body);
-    console.log('[PROXY] Original body:', req.body);
-    console.log('[PROXY] Transformed body:', transformedBody);
+    console.log('[PROXY] Original body:', JSON.stringify(req.body, null, 2));
+    console.log('[PROXY] Transformed body:', JSON.stringify(transformedBody, null, 2));
+    console.log('[PROXY] Target URL:', targetUrl);
+    console.log('[PROXY] Target Headers:', JSON.stringify(targetHeaders, null, 2));
 
     let response;
     try {
@@ -364,8 +373,37 @@ router.use(async (req, res, next) => {
         maxContentLength: 50 * 1024 * 1024
       };
 
+      console.log('========== API REQUEST START ==========');
+      console.log('[PROXY] Request URL:', axiosConfig.url);
+      console.log('[PROXY] Request Method:', axiosConfig.method);
+      console.log('[PROXY] Request Headers:', JSON.stringify(axiosConfig.headers, null, 2));
+      console.log('[PROXY] Request Body:', JSON.stringify(axiosConfig.data, null, 2));
+      console.log('========== API REQUEST END ==========');
+
       response = await axios(axiosConfig);
+
+      console.log('========== API RESPONSE START ==========');
+      console.log('[PROXY] Response Status:', response.status);
+      console.log('[PROXY] Response StatusText:', response.statusText);
+      console.log('[PROXY] Response Headers:', JSON.stringify(response.headers, null, 2));
+      console.log('[PROXY] Response Body:', JSON.stringify(response.data, null, 2));
+      console.log('========== API RESPONSE END ==========');
     } catch (proxyError) {
+      console.log('========== API REQUEST FAILED ==========');
+      console.error('[PROXY] Request Error:', proxyError.message);
+      console.error('[PROXY] Request Error Code:', proxyError.code);
+      console.error('[PROXY] Request Error Config:', proxyError.config ? {
+        url: proxyError.config.url,
+        method: proxyError.config.method,
+        headers: proxyError.config.headers,
+        data: proxyError.config.data
+      } : 'No config available');
+      console.error('[PROXY] Request Error Response:', proxyError.response ? {
+        status: proxyError.response.status,
+        data: proxyError.response.data
+      } : 'No response available');
+      console.log('========== END FAILED ==========');
+      
       const isTimeout = proxyError.code === 'ECONNABORTED' || proxyError.code === 'ETIMEDOUT';
       
       let requestBodyStr = '';

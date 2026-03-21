@@ -1,8 +1,27 @@
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
+const jwt = require('jsonwebtoken');
 const { User, Skill, Invocation, BalanceLog } = require('../models');
 const { redis, KEYS, TTL } = require('../config/redis');
+
+const authenticate = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    next(error);
+  }
+};
 
 /**
  * High-performance billing API
@@ -123,12 +142,13 @@ router.post('/consume', async (req, res, next) => {
   }
 });
 
-/**
- * Get balance for a user (for display purposes)
- */
-router.get('/balance/:userId', async (req, res, next) => {
+router.get('/balance/:userId', authenticate, async (req, res, next) => {
   try {
     const { userId } = req.params;
+    
+    if (userId !== req.user.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
     
     const cachedBalance = await redis.get(KEYS.balance(userId));
     
@@ -158,12 +178,14 @@ router.get('/balance/:userId', async (req, res, next) => {
   }
 });
 
-/**
- * Get invocation records for a user
- */
-router.get('/records/:userId', async (req, res, next) => {
+router.get('/records/:userId', authenticate, async (req, res, next) => {
   try {
     const { userId } = req.params;
+    
+    if (userId !== req.user.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
     const { page = 1, limit = 20 } = req.query;
     
     const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -194,12 +216,13 @@ router.get('/records/:userId', async (req, res, next) => {
   }
 });
 
-/**
- * Reconciliation endpoint - sync Redis cache with database
- */
-router.post('/reconcile/:userId', async (req, res, next) => {
+router.post('/reconcile/:userId', authenticate, async (req, res, next) => {
   try {
     const { userId } = req.params;
+    
+    if (userId !== req.user.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
     
     const user = await User.findByPk(userId);
     if (!user) {

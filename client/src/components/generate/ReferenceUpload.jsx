@@ -3,17 +3,33 @@ import { Upload, X, Image as ImageIcon } from 'lucide-react'
 
 const MAX_IMAGES = 10
 
+const readFileAsBase64 = (file) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      resolve(reader.result)
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
 export default function ReferenceUpload({ images = [], onChange }) {
   const [isDragOver, setIsDragOver] = useState(false)
   
-  const handleFiles = useCallback((files) => {
-    const newImages = Array.from(files)
-      .filter(file => file.type.startsWith('image/'))
-      .map(file => ({
-        file,
-        url: URL.createObjectURL(file),
-        id: `${Date.now()}-${Math.random()}`
-      }))
+  const handleFiles = useCallback(async (files) => {
+    const fileArray = Array.from(files).filter(file => file.type.startsWith('image/'))
+    
+    const newImages = await Promise.all(
+      fileArray.map(async (file) => {
+        const base64 = await readFileAsBase64(file)
+        return {
+          file,
+          url: base64,
+          id: `${Date.now()}-${Math.random()}`
+        }
+      })
+    )
     
     const allImages = [...images, ...newImages].slice(0, MAX_IMAGES)
     onChange?.(allImages)

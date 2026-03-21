@@ -1,16 +1,32 @@
 const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
+const jwt = require('jsonwebtoken');
 const { Order, User, Skill } = require('../models');
 const { redis, KEYS } = require('../config/redis');
 
-/**
- * Create order
- * POST /api/orders/create
- */
-router.post('/create', async (req, res, next) => {
+const authenticate = async (req, res, next) => {
   try {
-    const { userId, skillId, packageSize, paymentMethod } = req.body;
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    next(error);
+  }
+};
+
+router.post('/create', authenticate, async (req, res, next) => {
+  try {
+    const { skillId, packageSize, paymentMethod } = req.body;
+    const userId = req.user.userId;
     
     // Validate user
     const user = await User.findByPk(userId);
@@ -64,16 +80,11 @@ router.post('/create', async (req, res, next) => {
   }
 });
 
-/**
- * Get user's orders
- * GET /api/orders
- */
-router.get('/', async (req, res, next) => {
+router.get('/', authenticate, async (req, res, next) => {
   try {
-    const { userId, page = 1, limit = 20, status } = req.query;
+    const { page = 1, limit = 20, status } = req.query;
     
-    const where = {};
-    if (userId) where.userId = userId;
+    const where = { userId: req.user.userId };
     if (status) where.status = status;
     
     const offset = (parseInt(page) - 1) * parseInt(limit);
@@ -102,11 +113,7 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-/**
- * Get order by ID
- * GET /api/orders/:id
- */
-router.get('/:id', async (req, res, next) => {
+router.get('/:id', authenticate, async (req, res, next) => {
   try {
     const { id } = req.params;
     
@@ -121,17 +128,17 @@ router.get('/:id', async (req, res, next) => {
       return res.status(404).json({ error: 'Order not found' });
     }
     
+    if (order.userId !== req.user.userId) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    
     res.json({ order });
   } catch (error) {
     next(error);
   }
 });
 
-/**
- * Get order by order number
- * GET /api/orders/no/:orderNo
- */
-router.get('/no/:orderNo', async (req, res, next) => {
+router.get('/no/:orderNo', authenticate, async (req, res, next) => {
   try {
     const { orderNo } = req.params;
     
@@ -145,6 +152,10 @@ router.get('/no/:orderNo', async (req, res, next) => {
     
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
+    }
+    
+    if (order.userId !== req.user.userId) {
+      return res.status(403).json({ error: 'Access denied' });
     }
     
     res.json({ order });

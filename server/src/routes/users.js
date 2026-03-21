@@ -78,23 +78,26 @@ router.post('/reset-key', authenticate, async (req, res, next) => {
  */
 router.get('/balance-logs', authenticate, async (req, res, next) => {
   try {
-    const { page = 1, limit = 30 } = req.query;
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const { page = 1, pageSize = 10 } = req.query;
+    const validPageSizes = [10, 20, 30, 50];
+    const limit = validPageSizes.includes(parseInt(pageSize)) ? parseInt(pageSize) : 10;
+    const offset = (parseInt(page) - 1) * limit;
     
     const { count, rows } = await BalanceLog.findAndCountAll({
       where: { userId: req.user.userId },
       order: [['created_at', 'DESC']],
-      limit: parseInt(limit),
+      limit,
       offset
     });
     
     res.json({
+      success: true,
       logs: rows,
       pagination: {
         total: count,
         page: parseInt(page),
-        limit: parseInt(limit),
-        pages: Math.ceil(count / parseInt(limit))
+        pageSize: limit,
+        pages: Math.ceil(count / limit)
       }
     });
   } catch (error) {

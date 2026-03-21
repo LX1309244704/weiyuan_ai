@@ -16,6 +16,7 @@ function RechargeNew() {
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/login')
+      return
     }
   }, [isAuthenticated, navigate])
   
@@ -38,7 +39,6 @@ function RechargeNew() {
     
     try {
       const orderResponse = await api.post('/orders/create', {
-        userId: user.id,
         skillId: null,
         packageSize: selectedPackage.size,
         paymentMethod: paymentMethod

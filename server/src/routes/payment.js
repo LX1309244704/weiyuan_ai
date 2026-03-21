@@ -1,13 +1,28 @@
 const express = require('express');
 const router = express.Router();
+const jwt = require('jsonwebtoken');
 const { Order, User, BalanceLog, Skill } = require('../models');
 const { redis, KEYS } = require('../config/redis');
 
-/**
- * Create payment order
- * POST /api/payment/create
- */
-router.post('/create', async (req, res, next) => {
+const authenticate = async (req, res, next) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+    
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ error: 'Invalid token' });
+    }
+    next(error);
+  }
+};
+
+router.post('/create', authenticate, async (req, res, next) => {
   try {
     const { orderId, paymentMethod } = req.body;
     
@@ -80,11 +95,7 @@ router.post('/create', async (req, res, next) => {
   }
 });
 
-/**
- * Get payment status
- * GET /api/payment/status/:orderNo
- */
-router.get('/status/:orderNo', async (req, res, next) => {
+router.get('/status/:orderNo', authenticate, async (req, res, next) => {
   try {
     const { orderNo } = req.params;
     
@@ -98,6 +109,10 @@ router.get('/status/:orderNo', async (req, res, next) => {
     
     if (!order) {
       return res.status(404).json({ error: '订单不存在' });
+    }
+    
+    if (order.userId !== req.user.userId) {
+      return res.status(403).json({ error: '无权访问此订单' });
     }
     
     res.json({
@@ -117,11 +132,7 @@ router.get('/status/:orderNo', async (req, res, next) => {
   }
 });
 
-/**
- * Mock payment - for development
- * POST /api/payment/mock-pay
- */
-router.post('/mock-pay', async (req, res, next) => {
+router.post('/mock-pay', authenticate, async (req, res, next) => {
   try {
     const { orderNo } = req.body;
     
@@ -129,6 +140,10 @@ router.post('/mock-pay', async (req, res, next) => {
     
     if (!order) {
       return res.status(404).json({ error: '订单不存在' });
+    }
+    
+    if (order.userId !== req.user.userId) {
+      return res.status(403).json({ error: '无权操作此订单' });
     }
     
     if (order.status !== 'pending') {

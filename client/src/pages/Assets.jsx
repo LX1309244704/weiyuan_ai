@@ -16,9 +16,11 @@ function Assets() {
   const [filter, setFilter] = useState('all')
   
   useEffect(() => {
-    if (isAuthenticated) {
-      fetchAssets()
+    if (!isAuthenticated) {
+      navigate('/login')
+      return
     }
+    fetchAssets()
   }, [isAuthenticated])
   
   const fetchAssets = async () => {
@@ -173,34 +175,6 @@ function Assets() {
                 <Image size={40} />
               </div>
               <p>加载中...</p>
-            </div>
-          ) : !isAuthenticated ? (
-            <div style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '4rem',
-              color: 'var(--ai-text-secondary)'
-            }}>
-              <Image size={40} style={{ marginBottom: '1rem', color: 'var(--ai-text-muted)' }} />
-              <h3 style={{ marginBottom: '0.5rem', color: 'var(--ai-text-primary)' }}>请先登录</h3>
-              <p style={{ fontSize: '0.875rem', marginBottom: '1.5rem' }}>登录后可查看生成的资产</p>
-              <button
-                onClick={() => navigate('/login')}
-                style={{
-                  padding: '0.75rem 2rem',
-                  background: 'var(--ai-accent-green)',
-                  border: 'none',
-                  borderRadius: '8px',
-                  color: '#000',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  fontSize: '0.875rem'
-                }}
-              >
-                一键登录
-              </button>
             </div>
           ) : assets.length === 0 ? (
             <div style={{

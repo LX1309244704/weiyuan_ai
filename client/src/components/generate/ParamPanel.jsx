@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { Settings2 } from 'lucide-react'
 
 const IMAGE_RESOLUTIONS = [
+  { value: '4K', label: '4K 超清' },
   { value: '2K', label: '2K 高清' },
-  { value: '1080P', label: '1080P' },
-  { value: '720P', label: '720P' }
+  { value: '1K', label: '1K 标准' }
 ]
 
 const IMAGE_ASPECT_RATIOS = [
@@ -34,12 +34,15 @@ function ParamOptionGroup({ label, paramKey, paramConfig, currentValue, onChange
   if (!paramConfig || !paramConfig.options) return null
   
   const displayLabel = paramConfig.label || label
-  const options = paramConfig.options.map(opt => {
+  const options = (paramConfig.options || []).map(opt => {
     if (typeof opt === 'object') {
       return { value: opt.value, label: opt.label }
     }
     return { value: opt, label: String(opt) }
   })
+  
+  const defaultValue = paramConfig.default || options[0]?.value
+  const current = currentValue !== undefined ? currentValue : defaultValue
   
   return (
     <div className="ai-param-item">
@@ -48,7 +51,7 @@ function ParamOptionGroup({ label, paramKey, paramConfig, currentValue, onChange
         {options.map((opt) => (
           <div
             key={opt.value}
-            className={`ai-param-option ${String(currentValue) === String(opt.value) ? 'selected' : ''}`}
+            className={`ai-param-option ${String(current) === String(opt.value) ? 'selected' : ''}`}
             onClick={() => onChange(paramKey, opt.value)}
           >
             {opt.label}

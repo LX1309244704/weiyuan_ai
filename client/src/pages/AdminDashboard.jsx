@@ -17,6 +17,7 @@ const menuItems = [
   { key: 'dashboard', label: '仪表盘', icon: LayoutDashboard },
   { key: 'skills', label: 'Skill 管理', icon: Wrench },
   { key: 'endpoints', label: 'API 端点', icon: Code },
+  { key: 'api-docs', label: 'API 文档', icon: Server },
   { key: 'invocations', label: '调用记录', icon: Zap },
   { key: 'orders', label: '订单管理', icon: ShoppingCart },
   { key: 'users', label: '用户管理', icon: Users },
@@ -199,6 +200,7 @@ export default function AdminDashboard() {
         {activeTab === 'dashboard' && <DashboardTab />}
         {activeTab === 'skills' && <SkillsTab />}
         {activeTab === 'endpoints' && <EndpointsTab />}
+        {activeTab === 'api-docs' && <ApiDocsTab />}
         {activeTab === 'invocations' && <InvocationsTab />}
         {activeTab === 'orders' && <OrdersTab />}
         {activeTab === 'users' && <UsersTab />}
@@ -1970,5 +1972,528 @@ function LogsModal({ endpoint, onClose }) {
         </div>
       )}
     </Modal>
+  )
+}
+
+// ==================== API Docs ====================
+
+const API_DOCS = [
+  {
+    category: '认证',
+    endpoints: [
+      {
+        method: 'POST',
+        path: '/api/auth/register',
+        name: '用户注册',
+        description: '注册新用户账户',
+        body: { email: 'user@example.com', password: 'password123', name: '用户名' },
+        response: { success: true, user: { id: 'uuid', email: 'user@example.com', apiKey: 'xxx' }, token: 'jwt_token' }
+      },
+      {
+        method: 'POST',
+        path: '/api/auth/login',
+        name: '用户登录',
+        description: '登录获取Token',
+        body: { email: 'user@example.com', password: 'password123' },
+        response: { success: true, user: { id: 'uuid', email: 'user@example.com' }, token: 'jwt_token' }
+      },
+      {
+        method: 'GET',
+        path: '/api/auth/me',
+        name: '获取当前用户',
+        description: '获取当前登录用户信息',
+        auth: 'Bearer Token',
+        response: { user: { id: 'uuid', email: 'user@example.com', balance: 1000 } }
+      }
+    ]
+  },
+  {
+    category: '用户',
+    endpoints: [
+      {
+        method: 'GET',
+        path: '/api/users/me',
+        name: '获取用户信息',
+        description: '获取当前用户的详细信息',
+        auth: 'Bearer Token',
+        response: { user: { id: 'uuid', email: 'user@example.com', name: '用户', balance: 1000, apiKey: 'xxx' } }
+      },
+      {
+        method: 'POST',
+        path: '/api/users/reset-key',
+        name: '重置API Key',
+        description: '重新生成用户的API Key',
+        auth: 'Bearer Token',
+        response: { message: 'API key reset successfully', apiKey: 'new_api_key' }
+      },
+      {
+        method: 'GET',
+        path: '/api/users/balance-logs',
+        name: '积分变动记录',
+        description: '获取用户积分变动历史',
+        auth: 'Bearer Token',
+        query: { page: 1, pageSize: 10 },
+        response: { logs: [], pagination: { total: 0, page: 1, pageSize: 10, pages: 0 } }
+      },
+      {
+        method: 'GET',
+        path: '/api/users/orders',
+        name: '用户订单',
+        description: '获取用户的订单列表',
+        auth: 'Bearer Token',
+        response: { orders: [] }
+      }
+    ]
+  },
+  {
+    category: '充值',
+    endpoints: [
+      {
+        method: 'POST',
+        path: '/api/orders/create',
+        name: '创建订单',
+        description: '创建充值订单',
+        auth: 'Bearer Token',
+        body: { packageSize: 100, paymentMethod: 'wechat' },
+        response: { order: { id: 'uuid', orderNo: 'ORDxxx', amount: 10000, status: 'pending' } }
+      },
+      {
+        method: 'POST',
+        path: '/api/payment/create',
+        name: '创建支付',
+        description: '为订单创建支付',
+        auth: 'Bearer Token',
+        body: { orderId: 'order_uuid', paymentMethod: 'wechat' },
+        response: { paymentUrl: 'https://...', qrCode: 'weixin://...' }
+      },
+      {
+        method: 'GET',
+        path: '/api/payment/status/:orderNo',
+        name: '查询支付状态',
+        description: '查询订单支付状态',
+        auth: 'Bearer Token',
+        response: { orderNo: 'ORDxxx', status: 'paid', amount: 10000, packageSize: 100 }
+      }
+    ]
+  },
+  {
+    category: '兑换码',
+    endpoints: [
+      {
+        method: 'POST',
+        path: '/api/coupon/redeem',
+        name: '兑换码兑换',
+        description: '使用兑换码兑换积分',
+        body: { code: 'WYXXXXXXXX' },
+        response: { success: true, message: '兑换成功', amount: 100, balance: 1100 }
+      },
+      {
+        method: 'POST',
+        path: '/api/coupon/create',
+        name: '创建兑换码',
+        description: '创建新的兑换码（管理员）',
+        body: { amount: 100, type: 'gift', maxUses: 1, count: 10 },
+        response: { success: true, coupons: [{ code: 'WYXXXXXXXX', amount: 100 }] }
+      }
+    ]
+  },
+  {
+    category: 'AI 生成',
+    endpoints: [
+      {
+        method: 'GET',
+        path: '/api/ai-generate/models',
+        name: '获取模型列表',
+        description: '获取可用的AI生成模型列表',
+        response: { success: true, models: [{ id: 'uuid', name: 'Gemini 3 Pro', type: 'image' }] }
+      },
+      {
+        method: 'POST',
+        path: '/api/ai-generate/:pathPrefix',
+        name: 'AI生成请求',
+        description: '发送AI生成请求（图片/视频）',
+        headers: { 'X-API-Key': 'your_api_key' },
+        body: { prompt: '一只可爱的猫咪', resolution: '2K', aspectRatio: '3:4' },
+        response: { success: true, taskId: 'task_id', status: 'processing' }
+      },
+      {
+        method: 'GET',
+        path: '/api/ai-generate/tasks',
+        name: '获取任务列表',
+        description: '获取用户的生成任务历史',
+        headers: { 'X-API-Key': 'your_api_key' },
+        query: { page: 1, pageSize: 10, status: 'all' },
+        response: { success: true, tasks: [], total: 0 }
+      },
+      {
+        method: 'GET',
+        path: '/api/ai-generate/task/:taskId',
+        name: '查询任务状态',
+        description: '查询单个任务的状态和结果',
+        response: { success: true, taskId: 'xxx', status: 'completed', resultUrl: 'https://...' }
+      },
+      {
+        method: 'GET',
+        path: '/api/ai-generate/stream',
+        name: 'SSE 实时推送',
+        description: '通过SSE实时接收任务状态更新',
+        query: { token: 'jwt_token' },
+        note: '返回 Server-Sent Events 流'
+      }
+    ]
+  },
+  {
+    category: 'API 代理',
+    endpoints: [
+      {
+        method: 'GET',
+        path: '/api/proxy/endpoints',
+        name: '获取端点列表',
+        description: '获取所有API代理端点',
+        response: { success: true, endpoints: [] }
+      },
+      {
+        method: 'POST',
+        path: '/api/proxy/:pathPrefix',
+        name: '代理请求',
+        description: '通过代理调用第三方API',
+        headers: { 'X-API-Key': 'your_api_key' },
+        body: { prompt: 'your request' },
+        response: { success: true, data: {} }
+      }
+    ]
+  }
+]
+
+function ApiDocsTab() {
+  const [expandedCategory, setExpandedCategory] = useState(null)
+  const [expandedEndpoint, setExpandedEndpoint] = useState(null)
+  const [testBody, setTestBody] = useState('')
+  const [testResult, setTestResult] = useState(null)
+  const [testLoading, setTestLoading] = useState(false)
+  const [apiKey, setApiKey] = useState('')
+  const [token, setToken] = useState('')
+  const [copied, setCopied] = useState('')
+
+  useEffect(() => {
+    const storedToken = localStorage.getItem('token')
+    if (storedToken) setToken(storedToken)
+    fetchApiKey()
+  }, [])
+
+  const fetchApiKey = async () => {
+    try {
+      const res = await api.get('/users/me')
+      setApiKey(res.data.user?.apiKey || '')
+    } catch (e) {}
+  }
+
+  const handleCopy = async (text, id) => {
+    await navigator.clipboard.writeText(text)
+    setCopied(id)
+    setTimeout(() => setCopied(''), 2000)
+  }
+
+  const handleTest = async (endpoint) => {
+    setTestLoading(true)
+    setTestResult(null)
+
+    try {
+      const config = {
+        method: endpoint.method,
+        url: endpoint.path,
+      }
+
+      if (endpoint.body && ['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
+        let body = {}
+        try {
+          body = testBody.trim() ? JSON.parse(testBody) : endpoint.body
+        } catch {
+          body = endpoint.body
+        }
+        config.data = body
+      }
+
+      if (endpoint.query) {
+        config.params = endpoint.query
+      }
+
+      if (endpoint.headers?.['X-API-Key']) {
+        config.headers = { 'X-API-Key': apiKey }
+      }
+
+      const response = await api(config)
+      setTestResult({ success: true, data: response.data, status: response.status })
+    } catch (error) {
+      setTestResult({
+        success: false,
+        error: error.response?.data || error.message,
+        status: error.response?.status
+      })
+    } finally {
+      setTestLoading(false)
+    }
+  }
+
+  const generateCurl = (endpoint) => {
+    let curl = `curl -X ${endpoint.method} "${window.location.origin}${endpoint.path}"`
+    
+    if (endpoint.headers?.['X-API-Key']) {
+      curl += ` \\\n  -H "X-API-Key: ${apiKey || 'YOUR_API_KEY'}"`
+    }
+    if (endpoint.auth) {
+      curl += ` \\\n  -H "Authorization: Bearer ${token || 'YOUR_TOKEN'}"`
+    }
+    curl += ` \\\n  -H "Content-Type: application/json"`
+    
+    if (endpoint.body && ['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
+      curl += ` \\\n  -d '${JSON.stringify(endpoint.body, null, 0)}'`
+    }
+    
+    return curl
+  }
+
+  const generateJsCode = (endpoint) => {
+    const hasAuth = endpoint.auth || endpoint.headers?.['X-API-Key']
+    let code = `const response = await fetch('${window.location.origin}${endpoint.path}', {\n`
+    code += `  method: '${endpoint.method}',\n`
+    code += `  headers: {\n    'Content-Type': 'application/json',\n`
+    if (endpoint.headers?.['X-API-Key']) {
+      code += `    'X-API-Key': '${apiKey || 'YOUR_API_KEY'}',\n`
+    }
+    if (endpoint.auth) {
+      code += `    'Authorization': 'Bearer ${token || 'YOUR_TOKEN'}',\n`
+    }
+    code += `  },\n`
+    if (endpoint.body && ['POST', 'PUT', 'PATCH'].includes(endpoint.method)) {
+      code += `  body: JSON.stringify(${JSON.stringify(endpoint.body, null, 4)})\n`
+    }
+    code += `});\n\nconst data = await response.json();\nconsole.log(data);`
+    return code
+  }
+
+  const getMethodColor = (method) => {
+    const colors = {
+      GET: '#22c55e',
+      POST: '#3b82f6',
+      PUT: '#f59e0b',
+      DELETE: '#ef4444',
+      PATCH: '#8b5cf6'
+    }
+    return colors[method] || '#64748b'
+  }
+
+  return (
+    <div>
+      <div style={{ marginBottom: '1.5rem', display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ padding: '0.75rem 1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>您的 API Key: </span>
+          <code style={{ fontSize: '0.875rem', color: '#6366f1', fontWeight: 500 }}>{apiKey || '请先登录'}</code>
+          {apiKey && (
+            <button onClick={() => handleCopy(apiKey, 'apikey')} style={{ marginLeft: '0.5rem', padding: '0.25rem 0.5rem', fontSize: '0.75rem', background: '#6366f1', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+              {copied === 'apikey' ? '已复制' : '复制'}
+            </button>
+          )}
+        </div>
+        <div style={{ padding: '0.75rem 1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+          <span style={{ fontSize: '0.75rem', color: '#64748b' }}>Base URL: </span>
+          <code style={{ fontSize: '0.875rem', color: '#6366f1', fontWeight: 500 }}>{window.location.origin}</code>
+        </div>
+      </div>
+
+      {API_DOCS.map((category, catIdx) => (
+        <div key={catIdx} style={{ marginBottom: '1rem', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+          <button
+            onClick={() => setExpandedCategory(expandedCategory === catIdx ? null : catIdx)}
+            style={{
+              width: '100%',
+              padding: '1rem 1.5rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: expandedCategory === catIdx ? '#f8fafc' : 'white',
+              border: 'none',
+              cursor: 'pointer',
+              transition: 'background 0.2s'
+            }}
+          >
+            <span style={{ fontSize: '1rem', fontWeight: 600, color: '#0f172a' }}>{category.category}</span>
+            <span style={{ fontSize: '0.875rem', color: '#64748b' }}>{category.endpoints.length} 个端点</span>
+          </button>
+
+          {expandedCategory === catIdx && (
+            <div style={{ borderTop: '1px solid #e2e8f0' }}>
+              {category.endpoints.map((endpoint, endIdx) => (
+                <div key={endIdx} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                  <button
+                    onClick={() => setExpandedEndpoint(expandedEndpoint === `${catIdx}-${endIdx}` ? null : `${catIdx}-${endIdx}`)}
+                    style={{
+                      width: '100%',
+                      padding: '1rem 1.5rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '1rem',
+                      background: expandedEndpoint === `${catIdx}-${endIdx}` ? '#faf5ff' : 'white',
+                      border: 'none',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <span style={{
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '4px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      background: getMethodColor(endpoint.method),
+                      color: 'white',
+                      minWidth: '60px',
+                      textAlign: 'center'
+                    }}>
+                      {endpoint.method}
+                    </span>
+                    <code style={{ fontSize: '0.875rem', color: '#374151', fontWeight: 500 }}>{endpoint.path}</code>
+                    <span style={{ fontSize: '0.875rem', color: '#64748b' }}>{endpoint.name}</span>
+                  </button>
+
+                  {expandedEndpoint === `${catIdx}-${endIdx}` && (
+                    <div style={{ padding: '1rem 1.5rem', background: '#fafafa' }}>
+                      <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '1rem' }}>{endpoint.description}</p>
+
+                      {endpoint.auth && (
+                        <div style={{ marginBottom: '1rem' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#374151' }}>认证方式: </span>
+                          <code style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', background: '#fef3c7', borderRadius: '4px', color: '#92400e' }}>{endpoint.auth}</code>
+                        </div>
+                      )}
+
+                      {endpoint.headers && (
+                        <div style={{ marginBottom: '1rem' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#374151', display: 'block', marginBottom: '0.5rem' }}>请求头:</span>
+                          <pre style={{ fontSize: '0.75rem', padding: '0.75rem', background: '#1f2937', borderRadius: '6px', color: '#4ade80', overflow: 'auto' }}>
+                            {JSON.stringify(endpoint.headers, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+
+                      {endpoint.query && (
+                        <div style={{ marginBottom: '1rem' }}>
+                          <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#374151', display: 'block', marginBottom: '0.5rem' }}>查询参数:</span>
+                          <pre style={{ fontSize: '0.75rem', padding: '0.75rem', background: '#1f2937', borderRadius: '6px', color: '#60a5fa', overflow: 'auto' }}>
+                            {JSON.stringify(endpoint.query, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+
+                      {endpoint.body && (
+                        <div style={{ marginBottom: '1rem' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                            <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#374151' }}>请求体示例:</span>
+                            <button onClick={() => handleCopy(JSON.stringify(endpoint.body, null, 2), `body-${catIdx}-${endIdx}`)} style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem', background: '#e2e8f0', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                              {copied === `body-${catIdx}-${endIdx}` ? '已复制' : '复制'}
+                            </button>
+                          </div>
+                          <pre style={{ fontSize: '0.75rem', padding: '0.75rem', background: '#1f2937', borderRadius: '6px', color: '#f472b6', overflow: 'auto' }}>
+                            {JSON.stringify(endpoint.body, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+
+                      <div style={{ marginBottom: '1rem' }}>
+                        <span style={{ fontSize: '0.75rem', fontWeight: 500, color: '#374151', display: 'block', marginBottom: '0.5rem' }}>响应示例:</span>
+                        <pre style={{ fontSize: '0.75rem', padding: '0.75rem', background: '#1f2937', borderRadius: '6px', color: '#34d399', overflow: 'auto', maxHeight: '200px' }}>
+                          {JSON.stringify(endpoint.response, null, 2)}
+                        </pre>
+                      </div>
+
+                      <div style={{ marginBottom: '1rem' }}>
+                        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                          <button onClick={() => handleCopy(generateCurl(endpoint), `curl-${catIdx}-${endIdx}`)} style={{ fontSize: '0.75rem', padding: '0.375rem 0.75rem', background: '#1f2937', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                            {copied === `curl-${catIdx}-${endIdx}` ? '已复制' : 'cURL'}
+                          </button>
+                          <button onClick={() => handleCopy(generateJsCode(endpoint), `js-${catIdx}-${endIdx}`)} style={{ fontSize: '0.75rem', padding: '0.375rem 0.75rem', background: '#eab308', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer' }}>
+                            {copied === `js-${catIdx}-${endIdx}` ? '已复制' : 'JavaScript'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {(endpoint.method === 'POST' || endpoint.method === 'PUT' || endpoint.method === 'PATCH') && (
+                        <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: '1rem' }}>
+                          <h4 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.75rem' }}>测试请求</h4>
+                          <textarea
+                            value={testBody}
+                            onChange={(e) => setTestBody(e.target.value)}
+                            placeholder={endpoint.body ? JSON.stringify(endpoint.body, null, 2) : '{}'}
+                            style={{
+                              width: '100%',
+                              minHeight: '100px',
+                              padding: '0.75rem',
+                              fontFamily: 'monospace',
+                              fontSize: '0.75rem',
+                              border: '1px solid #e2e8f0',
+                              borderRadius: '6px',
+                              resize: 'vertical'
+                            }}
+                          />
+                          <button
+                            onClick={() => handleTest(endpoint)}
+                            disabled={testLoading}
+                            style={{
+                              marginTop: '0.75rem',
+                              padding: '0.5rem 1rem',
+                              background: testLoading ? '#94a3b8' : '#6366f1',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '6px',
+                              fontSize: '0.875rem',
+                              fontWeight: 500,
+                              cursor: testLoading ? 'not-allowed' : 'pointer',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '0.5rem'
+                            }}
+                          >
+                            <Play size={14} />
+                            {testLoading ? '请求中...' : '发送请求'}
+                          </button>
+
+                          {testResult && (
+                            <div style={{ marginTop: '1rem' }}>
+                              <h4 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.5rem' }}>
+                                响应结果
+                                <span style={{
+                                  marginLeft: '0.5rem',
+                                  padding: '0.125rem 0.5rem',
+                                  borderRadius: '4px',
+                                  fontSize: '0.75rem',
+                                  background: testResult.success ? '#dcfce7' : '#fee2e2',
+                                  color: testResult.success ? '#166534' : '#991b1b'
+                                }}>
+                                  {testResult.status || 'Error'}
+                                </span>
+                              </h4>
+                              <pre style={{
+                                fontSize: '0.75rem',
+                                padding: '0.75rem',
+                                background: testResult.success ? '#f0fdf4' : '#fef2f2',
+                                borderRadius: '6px',
+                                overflow: 'auto',
+                                maxHeight: '300px',
+                                border: `1px solid ${testResult.success ? '#bbf7d0' : '#fecaca'}`
+                              }}>
+                                {JSON.stringify(testResult.success ? testResult.data : testResult.error, null, 2)}
+                              </pre>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
   )
 }

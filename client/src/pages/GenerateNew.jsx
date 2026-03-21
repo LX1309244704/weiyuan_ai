@@ -13,12 +13,14 @@ import '../styles/generate.css'
 
 const DEFAULT_MODELS = [
   { 
-    id: 'image-v3', 
-    name: '图片 3.0', 
+    id: 'gemini-3-pro-image', 
+    name: 'Gemini 3 Pro 图片', 
     description: '强化一致性，自由多参考图，全面效果升级',
     type: 'image',
     icon: '🖼️',
-    isBuiltIn: true,
+    isBuiltIn: false,
+    endpointId: null,
+    pathPrefix: 'gemini-3-pro-image',
     defaultParams: {
       resolution: '2K',
       aspectRatio: '3:4',
@@ -26,25 +28,29 @@ const DEFAULT_MODELS = [
     }
   },
   { 
-    id: 'image-v2', 
-    name: '图片 2.0', 
-    description: '经典图片生成模型',
-    type: 'image',
-    icon: '🖼️',
-    isBuiltIn: true,
-    defaultParams: {
-      resolution: '1080P',
-      aspectRatio: '1:1',
-      numImages: 4
-    }
-  },
-  { 
-    id: 'video-v1', 
-    name: '视频 1.0', 
+    id: 'veo3.1', 
+    name: 'Veo 3.1 视频', 
     description: '高质量视频生成',
     type: 'video',
     icon: '🎬',
-    isBuiltIn: true,
+    isBuiltIn: false,
+    endpointId: null,
+    pathPrefix: 'veo3.1',
+    defaultParams: {
+      resolution: '1080P',
+      duration: 5,
+      fps: 24
+    }
+  },
+  { 
+    id: 'grok3.1', 
+    name: 'Grok 3.1 视频', 
+    description: 'Grok AI 视频生成',
+    type: 'video',
+    icon: '🎬',
+    isBuiltIn: false,
+    endpointId: null,
+    pathPrefix: 'grok3.1',
     defaultParams: {
       resolution: '1080P',
       duration: 5,
@@ -68,16 +74,22 @@ export default function GenerateNew() {
   const [estimatedTime, setEstimatedTime] = useState(null)
   const [results, setResults] = useState([])
   const [error, setError] = useState(null)
+  const [currentTaskId, setCurrentTaskId] = useState(null)
   
-  const [tools, setTools] = useState([])
+const [tools, setTools] = useState([])
   const [selectedTool, setSelectedTool] = useState([])
   const [userApiKey, setUserApiKey] = useState('')
-  
+  const [token, setToken] = useState('')
+   
   useEffect(() => {
     fetchApiEndpoints()
     fetchTools()
     if (isAuthenticated) {
       fetchUserApiKey()
+      const storedToken = localStorage.getItem('token')
+      if (storedToken) {
+        setToken(storedToken)
+      }
     }
   }, [])
   
@@ -87,53 +99,60 @@ export default function GenerateNew() {
       if (res.data.user?.apiKey) {
         setUserApiKey(res.data.user.apiKey)
       }
-    } catch (err) {
-      console.error('Failed to fetch user API key:', err)
+} catch (err) {
+        console.error('Failed to fetch user API key:', err)
+      }
     }
-  }
-  
-  const fetchApiEndpoints = async () => {
+    
+    const fetchApiEndpoints = async () => {
     try {
-      const response = await api.get('/proxy/endpoints?showInGenerate=1')
-      console.log('API Endpoints response:', response.data)
-      const endpoints = response.data.endpoints || []
-      console.log('Endpoints:', endpoints)
+      const response = await api.get('/ai-generate/models')
+      console.log('AI Generate models:', response.data)
+      const modelsList = response.data.models || []
       
-      if (endpoints.length > 0) {
-        console.log('Endpoints received:', endpoints)
-        const endpointModels = endpoints.map(ep => ({
-          id: `endpoint-${ep.id}`,
-          name: ep.name,
-          description: ep.description || `${ep.type} 类型 API`,
-          type: ep.type || 'api',
-          icon: ep.icon || '🔗',
+      if (modelsList.length > 0) {
+        const formattedModels = modelsList.map(m => ({
+          id: m.id,
+          name: m.name,
+          description: m.description || `${m.type} 类型模型`,
+          type: m.type,
+          icon: m.icon || '🖼️',
           isBuiltIn: false,
-          endpointId: ep.id,
-          pathPrefix: ep.pathPrefix,
-          defaultParams: ep.defaultParams || {},
-          customParams: ep.defaultParams || {},
-          pricePerCall: ep.pricePerCall
+          pathPrefix: m.pathPrefix,
+          defaultParams: m.defaultParams || {},
+          pricePerCall: m.pricePerCall
         }))
-        
-        console.log('Endpoint models with customParams:', endpointModels)
-        setModels([...DEFAULT_MODELS, ...endpointModels])
+        setModels(formattedModels)
       }
     } catch (err) {
-      console.error('Failed to fetch API endpoints:', err)
+      console.error('Failed to fetch AI Generate models:', err)
+      setModels([])
     }
   }
   
   useEffect(() => {
     if (selectedModel) {
-      if (!selectedModel.isBuiltIn && selectedModel.customParams) {
-        const customParams = selectedModel.customParams
+      const defaultParams = selectedModel.defaultParams || {}
+      
+      const hasStructuredParams = Object.values(defaultParams).some(
+        val => val && typeof val === 'object' && val.options
+      )
+      
+      if (!selectedModel.isBuiltIn && hasStructuredParams) {
+        const customParams = defaultParams
         const initialParams = {}
         Object.entries(customParams).forEach(([key, config]) => {
-          initialParams[key] = config.value
+          initialParams[key] = config.default || config.options?.[0]?.value
         })
         setParams(initialParams)
       } else {
-        setParams(selectedModel.defaultParams || {})
+        const simpleParams = {}
+        Object.entries(defaultParams).forEach(([key, val]) => {
+          if (typeof val !== 'object') {
+            simpleParams[key] = val
+          }
+        })
+        setParams(simpleParams)
       }
       
       if (!selectedModel.isBuiltIn) {
@@ -175,7 +194,7 @@ export default function GenerateNew() {
     const isApiEndpoint = !selectedModel?.isBuiltIn
     
     if (isApiEndpoint) {
-      if (!selectedModel?.endpointId) {
+      if (!selectedModel?.pathPrefix && !selectedModel?.endpointId) {
         alert('请选择模型')
         return
       }
@@ -209,6 +228,7 @@ export default function GenerateNew() {
     
     try {
       let response
+      let isAsyncTask = false
       
       const isApiEndpoint = !selectedModel?.isBuiltIn
       
@@ -227,7 +247,7 @@ export default function GenerateNew() {
         
         console.log('Request body:', requestBody)
         
-        response = await api.post(`/proxy/${selectedModel.pathPrefix}`, requestBody, {
+        response = await api.post(`/ai-generate/${selectedModel.pathPrefix}`, requestBody, {
           headers: userApiKey ? { 'X-API-Key': userApiKey } : {}
         })
         console.log('API response:', response.data)
@@ -249,33 +269,41 @@ export default function GenerateNew() {
       
       if (isApiEndpoint) {
         if (response.data.success || response.status === 200) {
-          setProgress(100)
-          
-          const resultUrls = []
-          
-          if (response.data.data) {
-            if (Array.isArray(response.data.data)) {
-              resultUrls.push(...response.data.data.map(url => ({ url })))
-            } else if (typeof response.data.data === 'string') {
-              resultUrls.push({ url: response.data.data })
-            } else if (response.data.data.url) {
-              resultUrls.push({ url: response.data.data.url })
-            } else if (response.data.data.result) {
-              if (Array.isArray(response.data.data.result)) {
-                resultUrls.push(...response.data.data.result.map(url => ({ url })))
-              } else {
-                resultUrls.push({ url: response.data.data.result })
+          if (response.data.taskId) {
+            isAsyncTask = true
+            setCurrentTaskId(response.data.taskId)
+            setProgress(0)
+            setGenerating(true)
+            console.log('Task submitted, taskId:', response.data.taskId)
+          } else if (response.data.data) {
+            setProgress(100)
+            
+            const resultUrls = []
+            
+            if (response.data.data) {
+              if (Array.isArray(response.data.data)) {
+                resultUrls.push(...response.data.data.map(url => ({ url })))
+              } else if (typeof response.data.data === 'string') {
+                resultUrls.push({ url: response.data.data })
+              } else if (response.data.data.url) {
+                resultUrls.push({ url: response.data.data.url })
+              } else if (response.data.data.result) {
+                if (Array.isArray(response.data.data.result)) {
+                  resultUrls.push(...response.data.data.result.map(url => ({ url })))
+                } else {
+                  resultUrls.push({ url: response.data.data.result })
+                }
               }
             }
-          }
-          
-          if (resultUrls.length > 0) {
-            setResults(resultUrls)
-            hasResult = true
+            
+            if (resultUrls.length > 0) {
+              setResults(resultUrls)
+              hasResult = true
+            }
           }
         }
         
-        if (!hasResult) {
+        if (!hasResult && !response.data.taskId) {
           setError(response.data.error || '生成失败')
         }
       } else {
@@ -310,10 +338,13 @@ export default function GenerateNew() {
       }
     } catch (err) {
       setError(err.response?.data?.error || err.message)
+      setGenerating(false)
     } finally {
       clearInterval(progressInterval)
       clearInterval(timeInterval)
-      setGenerating(false)
+      if (!isAsyncTask) {
+        setGenerating(false)
+      }
       setEstimatedTime(null)
     }
   }, [isAuthenticated, prompt, selectedTool, selectedModel, params, referenceImages])
@@ -382,7 +413,7 @@ export default function GenerateNew() {
             modelType={modelType}
             params={params}
             onChange={setParams}
-            customParams={!selectedModel?.isBuiltIn ? selectedModel?.customParams : null}
+            customParams={!selectedModel?.isBuiltIn ? selectedModel?.defaultParams : null}
           />
           
           <div style={{ marginTop: '1rem' }}>
@@ -472,12 +503,12 @@ export default function GenerateNew() {
             generating={generating}
             progress={progress}
             estimatedTime={estimatedTime}
-            results={results}
             modelType={modelType}
             onRegenerate={handleGenerate}
-            onDownload={handleDownload}
             isLoggedIn={isAuthenticated}
             onLogin={handleLogin}
+            token={token}
+            userApiKey={userApiKey}
           />
         </div>
       </div>

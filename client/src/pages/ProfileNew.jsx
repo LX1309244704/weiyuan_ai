@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Key, Wallet, ShoppingCart, Zap, Copy, RefreshCw, TrendingUp, TrendingDown, Clock, CheckCircle, XCircle, Plus, ArrowLeft } from 'lucide-react'
+import { Key, Wallet, ShoppingCart, Zap, Copy, RefreshCw, TrendingUp, TrendingDown, Clock, CheckCircle, XCircle, Plus, ArrowLeft, Gift } from 'lucide-react'
 import { useAuthStore } from '../context/AuthContext'
 import api from '../utils/api'
 import dayjs from 'dayjs'
@@ -16,6 +16,11 @@ function ProfileNew() {
   const [invocations, setInvocations] = useState([])
   const [loading, setLoading] = useState(false)
   const [resettingKey, setResettingKey] = useState(false)
+  const [couponCode, setCouponCode] = useState('')
+  const [redeeming, setRedeeming] = useState(false)
+  const [pageSize, setPageSize] = useState(10)
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pagination, setPagination] = useState({ total: 0, pages: 0 })
   
   useEffect(() => {
     if (!isAuthenticated) {
@@ -24,7 +29,7 @@ function ProfileNew() {
     }
     
     fetchData()
-  }, [activeTab])
+  }, [activeTab, currentPage, pageSize])
   
   useEffect(() => {
     if (isAuthenticated) {
@@ -36,8 +41,11 @@ function ProfileNew() {
     setLoading(true)
     try {
       if (activeTab === 'balance') {
-        const response = await api.get('/users/balance-logs')
+        const response = await api.get('/users/balance-logs', {
+          params: { page: currentPage, pageSize }
+        })
         setBalanceLogs(response.data.logs || [])
+        setPagination(response.data.pagination || { total: 0, pages: 0 })
       } else if (activeTab === 'orders') {
         const response = await api.get('/users/orders')
         setOrders(response.data.orders || [])
@@ -89,6 +97,37 @@ function ProfileNew() {
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text)
     alert('已复制到剪贴板')
+  }
+  
+  const handleRedeemCoupon = async () => {
+    if (!couponCode.trim()) {
+      alert('请输入兑换码')
+      return
+    }
+    
+    setRedeeming(true)
+    try {
+      const response = await api.post('/coupon/redeem', { code: couponCode.trim() })
+      alert(`兑换成功！获得 ${response.data.amount} 积分`)
+      setCouponCode('')
+      refreshUser()
+      if (activeTab === 'balance') {
+        fetchData()
+      }
+    } catch (error) {
+      alert(error.response?.data?.error || '兑换失败')
+    } finally {
+      setRedeeming(false)
+    }
+  }
+  
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage)
+  }
+  
+  const handlePageSizeChange = (newSize) => {
+    setPageSize(newSize)
+    setCurrentPage(1)
   }
   
   if (!isAuthenticated) return null
@@ -238,6 +277,51 @@ function ProfileNew() {
                 </button>
               </div>
             </div>
+            
+            <div style={{ 
+              display: 'flex', 
+              gap: '0.75rem', 
+              marginTop: '1rem',
+              flexWrap: 'wrap'
+            }}>
+              <input
+                type="text"
+                placeholder="输入兑换码"
+                value={couponCode}
+                onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                style={{
+                  flex: 1,
+                  minWidth: '200px',
+                  padding: '0.75rem 1rem',
+                  background: 'var(--ai-bg-elevated)',
+                  border: '1px solid var(--ai-border-color)',
+                  borderRadius: '8px',
+                  color: 'var(--ai-text-primary)',
+                  fontSize: '0.875rem',
+                  fontFamily: 'monospace'
+                }}
+              />
+              <button
+                onClick={handleRedeemCoupon}
+                disabled={redeeming}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: 'var(--ai-accent-green)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#000',
+                  fontWeight: 600,
+                  cursor: redeeming ? 'not-allowed' : 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  opacity: redeeming ? 0.7 : 1
+                }}
+              >
+                <Gift size={16} />
+                {redeeming ? '兑换中...' : '兑换'}
+              </button>
+            </div>
           </div>
           
           <div style={{ 
@@ -352,9 +436,32 @@ function ProfileNew() {
             
             {activeTab === 'balance' && (
               <div>
-                <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '1.5rem', color: 'var(--ai-text-primary)' }}>
-                  余额明细
-                </h3>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '1rem' }}>
+                  <h3 style={{ fontSize: '1.125rem', fontWeight: 600, color: 'var(--ai-text-primary)' }}>
+                    余额明细
+                  </h3>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.875rem', color: 'var(--ai-text-secondary)' }}>每页显示</span>
+                    <select
+                      value={pageSize}
+                      onChange={(e) => handlePageSizeChange(parseInt(e.target.value))}
+                      style={{
+                        padding: '0.375rem 0.75rem',
+                        background: 'var(--ai-bg-elevated)',
+                        border: '1px solid var(--ai-border-color)',
+                        borderRadius: '6px',
+                        color: 'var(--ai-text-primary)',
+                        fontSize: '0.875rem',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value={10}>10</option>
+                      <option value={20}>20</option>
+                      <option value={30}>30</option>
+                      <option value={50}>50</option>
+                    </select>
+                  </div>
+                </div>
                 
                 {loading ? (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '200px' }}>
@@ -366,46 +473,92 @@ function ProfileNew() {
                     <p>暂无记录</p>
                   </div>
                 ) : (
-                  <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', fontSize: '0.875rem' }}>
-                      <thead>
-                        <tr style={{ borderBottom: '2px solid var(--ai-border-color)' }}>
-                          <th style={{ textAlign: 'left', padding: '0.75rem', color: 'var(--ai-text-secondary)', fontWeight: 500 }}>时间</th>
-                          <th style={{ textAlign: 'left', padding: '0.75rem', color: 'var(--ai-text-secondary)', fontWeight: 500 }}>变动</th>
-                          <th style={{ textAlign: 'left', padding: '0.75rem', color: 'var(--ai-text-secondary)', fontWeight: 500 }}>原因</th>
-                          <th style={{ textAlign: 'right', padding: '0.75rem', color: 'var(--ai-text-secondary)', fontWeight: 500 }}>余额</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {balanceLogs.map((log) => (
-                          <tr key={log.id} style={{ borderBottom: '1px solid var(--ai-border-color)' }}>
-                            <td style={{ padding: '1rem 0.75rem', color: 'var(--ai-text-secondary)' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <Clock size={14} />
-                                {dayjs(log.createdAt).format('MM-DD HH:mm')}
-                              </div>
-                            </td>
-                            <td style={{ padding: '1rem 0.75rem' }}>
-                              <span style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.25rem',
-                                color: log.change > 0 ? 'var(--ai-accent-green)' : '#ef4444',
-                                fontWeight: 600
-                              }}>
-                                {log.change > 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
-                                {log.change > 0 ? '+' : ''}{log.change}
-                              </span>
-                            </td>
-                            <td style={{ padding: '1rem 0.75rem', color: 'var(--ai-text-primary)' }}>{log.reason}</td>
-                            <td style={{ padding: '1rem 0.75rem', textAlign: 'right', fontWeight: 500, color: 'var(--ai-accent-green)' }}>
-                              {log.balanceAfter}
-                            </td>
+                  <>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', fontSize: '0.875rem' }}>
+                        <thead>
+                          <tr style={{ borderBottom: '2px solid var(--ai-border-color)' }}>
+                            <th style={{ textAlign: 'left', padding: '0.75rem', color: 'var(--ai-text-secondary)', fontWeight: 500 }}>时间</th>
+                            <th style={{ textAlign: 'left', padding: '0.75rem', color: 'var(--ai-text-secondary)', fontWeight: 500 }}>变动</th>
+                            <th style={{ textAlign: 'left', padding: '0.75rem', color: 'var(--ai-text-secondary)', fontWeight: 500 }}>原因</th>
+                            <th style={{ textAlign: 'right', padding: '0.75rem', color: 'var(--ai-text-secondary)', fontWeight: 500 }}>余额</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody>
+                          {balanceLogs.map((log) => (
+                            <tr key={log.id} style={{ borderBottom: '1px solid var(--ai-border-color)' }}>
+                              <td style={{ padding: '1rem 0.75rem', color: 'var(--ai-text-secondary)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                  <Clock size={14} />
+                                  {dayjs(log.createdAt).format('MM-DD HH:mm')}
+                                </div>
+                              </td>
+                              <td style={{ padding: '1rem 0.75rem' }}>
+                                <span style={{
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.25rem',
+                                  color: log.change > 0 ? 'var(--ai-accent-green)' : '#ef4444',
+                                  fontWeight: 600
+                                }}>
+                                  {log.change > 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                                  {log.change > 0 ? '+' : ''}{log.change}
+                                </span>
+                              </td>
+                              <td style={{ padding: '1rem 0.75rem', color: 'var(--ai-text-primary)' }}>{log.reason}</td>
+                              <td style={{ padding: '1rem 0.75rem', textAlign: 'right', fontWeight: 500, color: 'var(--ai-accent-green)' }}>
+                                {log.balanceAfter}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    
+                    {pagination.pages > 1 && (
+                      <div style={{ 
+                        display: 'flex', 
+                        justifyContent: 'center', 
+                        alignItems: 'center', 
+                        gap: '0.5rem',
+                        marginTop: '1.5rem' 
+                      }}>
+                        <button
+                          onClick={() => handlePageChange(currentPage - 1)}
+                          disabled={currentPage === 1}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            background: currentPage === 1 ? 'var(--ai-bg-elevated)' : 'var(--ai-bg-secondary)',
+                            border: '1px solid var(--ai-border-color)',
+                            borderRadius: '6px',
+                            color: currentPage === 1 ? 'var(--ai-text-muted)' : 'var(--ai-text-primary)',
+                            cursor: currentPage === 1 ? 'not-allowed' : 'pointer',
+                            fontSize: '0.875rem'
+                          }}
+                        >
+                          上一页
+                        </button>
+                        <span style={{ color: 'var(--ai-text-secondary)', fontSize: '0.875rem' }}>
+                          第 {currentPage} / {pagination.pages} 页
+                        </span>
+                        <button
+                          onClick={() => handlePageChange(currentPage + 1)}
+                          disabled={currentPage === pagination.pages}
+                          style={{
+                            padding: '0.5rem 1rem',
+                            background: currentPage === pagination.pages ? 'var(--ai-bg-elevated)' : 'var(--ai-bg-secondary)',
+                            border: '1px solid var(--ai-border-color)',
+                            borderRadius: '6px',
+                            color: currentPage === pagination.pages ? 'var(--ai-text-muted)' : 'var(--ai-text-primary)',
+                            cursor: currentPage === pagination.pages ? 'not-allowed' : 'pointer',
+                            fontSize: '0.875rem'
+                          }}
+                        >
+                          下一页
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}

@@ -7,15 +7,19 @@ import { useAuthStore } from '../context/AuthContext'
 function Payment() {
   const { orderNo } = useParams()
   const navigate = useNavigate()
-  const { refreshUser } = useAuthStore()
+  const { refreshUser, isAuthenticated } = useAuthStore()
   const [order, setOrder] = useState(null)
   const [loading, setLoading] = useState(true)
   const [polling, setPolling] = useState(false)
   const [hasRefreshed, setHasRefreshed] = useState(false)
   
   useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login')
+      return
+    }
     fetchOrder()
-  }, [orderNo])
+  }, [orderNo, isAuthenticated])
   
   useEffect(() => {
     let interval

@@ -33,8 +33,9 @@ module.exports = (sequelize, DataTypes) => {
       comment: 'Related order ID or invocation ID'
     },
     type: {
-      type: DataTypes.ENUM('purchase', 'consume', 'refund', 'adjustment'),
-      allowNull: false
+      type: DataTypes.ENUM('consume', 'recharge', 'refund', 'adjust'),
+      allowNull: false,
+      comment: '变动类型: consume-消费, recharge-充值, refund-退款, adjust-调整'
     }
   }, {
     tableName: 'balance_logs',

@@ -623,6 +623,71 @@
   color: var(--ai-accent-green);
 }
 
+/* 参数描述文字 */
+.ai-param-desc {
+  font-size: 0.6875rem;
+  color: var(--ai-text-muted);
+  margin-top: -0.25rem;
+}
+
+/* 参数输入框 */
+.ai-param-input {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  background: var(--ai-bg-secondary);
+  border: 1px solid var(--ai-border-color);
+  border-radius: 8px;
+  color: var(--ai-text-primary);
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.ai-param-input:focus {
+  border-color: var(--ai-accent-green);
+}
+
+.ai-param-input::placeholder {
+  color: var(--ai-text-muted);
+}
+
+/* 参数滑块 */
+.ai-param-slider {
+  width: 100%;
+  height: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--ai-border-color);
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+.ai-param-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  background: var(--ai-accent-green);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.ai-param-slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+.ai-param-slider::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  background: var(--ai-accent-green);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+}
+
 /* =============================================
    生成按钮
    ============================================= */
@@ -1095,4 +1160,17 @@
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;
+}
+
+/* =============================================
+   任务卡片悬停效果
+   ============================================= */
+
+.ai-preview-area [style*="grid"] > div:hover {
+  border-color: var(--ai-accent-green) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.ai-preview-area [style*="grid"] > div:hover .task-card-buttons {
+  opacity: 1 !important;
 }

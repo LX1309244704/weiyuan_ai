@@ -5,7 +5,7 @@ import api from '../utils/api'
 import dayjs from 'dayjs'
 import InvocationsTab from '../components/admin/InvocationsTab'
 import { 
-  LayoutDashboard, Wrench, ShoppingCart, Users, DollarSign, Settings, 
+  LayoutDashboard, ShoppingCart, Users, DollarSign, Settings, 
   Home, Package, Search, Plus,
   Edit2, Trash2, Eye, RefreshCw, Award, CheckCircle, XCircle,
   Wallet, CreditCard, Shield, TrendingUp, Zap, Clock,
@@ -15,13 +15,13 @@ import {
 
 const menuItems = [
   { key: 'dashboard', label: '仪表盘', icon: LayoutDashboard },
-  { key: 'skills', label: 'Skill 管理', icon: Wrench },
+  { key: 'ai-models', label: 'AI 模型', icon: Settings },
   { key: 'endpoints', label: 'API 端点', icon: Code },
-  { key: 'api-docs', label: 'API 文档', icon: Server },
   { key: 'invocations', label: '调用记录', icon: Zap },
   { key: 'orders', label: '订单管理', icon: ShoppingCart },
   { key: 'users', label: '用户管理', icon: Users },
   { key: 'revenue', label: '财务统计', icon: DollarSign },
+  { key: 'redemption-codes', label: '兑换码', icon: Award },
   { key: 'settings', label: '系统设置', icon: Settings },
 ]
 
@@ -53,9 +53,192 @@ export default function AdminDashboard() {
         justifyContent: 'center'
       }}>
         <div className="loading-spinner"></div>
-      </div>
-    )
+    </div>
+  )
+}
+
+// ==================== AI Models ====================
+
+function AiModelsTab() {
+  const [models, setModels] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [editingModel, setEditingModel] = useState(null)
+  const [showModal, setShowModal] = useState(false)
+  const [apiKeyInput, setApiKeyInput] = useState('')
+  const [showApiKey, setShowApiKey] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => { fetchModels() }, [])
+
+  const fetchModels = async () => {
+    try {
+      const res = await api.get('/admin/ai-models')
+      setModels(res.data.models || [])
+    } catch (e) { console.error(e) }
+    finally { setLoading(false) }
   }
+
+  const handleEdit = (model) => {
+    setEditingModel(model)
+    setApiKeyInput('')
+    setShowModal(true)
+  }
+
+  const handleSave = async () => {
+    if (!apiKeyInput.trim()) {
+      alert('请输入 API Key')
+      return
+    }
+    setSaving(true)
+    try {
+      await api.put(`/admin/ai-models/${editingModel.id}`, { apiKey: apiKeyInput })
+      alert('保存成功')
+      setShowModal(false)
+      fetchModels()
+    } catch (e) {
+      alert('保存失败: ' + (e.response?.data?.error || e.message))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleToggle = async (model) => {
+    try {
+      await api.put(`/admin/ai-models/${model.id}`, { isActive: !model.isActive })
+      fetchModels()
+    } catch (e) { alert('操作失败') }
+  }
+
+  const providerIcons = {
+    runninghub: '🎨',
+    huoshan: '🔥'
+  }
+
+  const providerDescs = {
+    runninghub: '支持文生图和图生图',
+    huoshan: '火山引擎大模型服务'
+  }
+
+  return (
+    <div>
+      <div className="card" style={{ padding: '1.5rem', marginBottom: '1rem', background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', color: 'white' }}>
+        <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '0.5rem' }}>AI 模型配置</h3>
+        <p style={{ fontSize: '0.875rem', opacity: 0.9 }}>配置 AI 厂商的 API Key，这些配置将用于 AI 创作功能</p>
+      </div>
+
+      {loading ? (
+        <LoadingSpinner />
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))', gap: '1rem' }}>
+          {models.map(model => (
+            <div key={model.id} className="card" style={{ padding: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', marginBottom: '1rem' }}>
+                <div style={{ 
+                  width: '48px', 
+                  height: '48px', 
+                  borderRadius: '12px', 
+                  background: model.isActive ? 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)' : '#94a3b8',
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  fontSize: '1.5rem'
+                }}>
+                  {providerIcons[model.provider] || '🤖'}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                    <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#0f172a' }}>{model.name}</h4>
+                    <span className={`badge ${model.isActive ? 'badge-success' : 'badge-default'}`}>
+                      {model.isActive ? '已启用' : '已禁用'}
+                    </span>
+                  </div>
+                  <p style={{ fontSize: '0.75rem', color: '#64748b' }}>{providerDescs[model.provider] || model.provider}</p>
+                </div>
+              </div>
+
+              <div style={{ padding: '0.75rem', background: '#f8fafc', borderRadius: '8px', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b' }}>API Key 状态</span>
+                  {model.apiKey ? (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: '#22c55e' }}>
+                      <CheckCircle size={14} /> 已配置
+                    </span>
+                  ) : (
+                    <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', fontSize: '0.75rem', color: '#ef4444' }}>
+                      <AlertCircle size={14} /> 未配置
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button onClick={() => handleEdit(model)} className="btn-primary" style={{ flex: 1 }}>
+                  <Edit2 size={14} style={{ marginRight: '0.5rem' }} />
+                  {model.apiKey ? '更新 Key' : '配置 Key'}
+                </button>
+                <button 
+                  onClick={() => handleToggle(model)} 
+                  className={model.isActive ? 'btn-outline' : 'btn-primary'} 
+                  style={{ padding: '0.5rem 1rem', color: model.isActive ? '#f59e0b' : undefined, borderColor: model.isActive ? '#f59e0b' : undefined }}
+                >
+                  {model.isActive ? <XCircle size={16} /> : <CheckCircle size={16} />}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {showModal && editingModel && (
+        <Modal title={`配置 ${editingModel.name} API Key`} onClose={() => setShowModal(false)} maxWidth="500px">
+          <div style={{ marginBottom: '1rem' }}>
+            <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '1rem' }}>
+              请输入您的 {editingModel.name} API Key。API Key 将在服务器端加密存储。
+            </p>
+            <FormField label="API Key" required>
+              <div style={{ position: 'relative' }}>
+                <input 
+                  type={showApiKey ? 'text' : 'password'} 
+                  className="input" 
+                  value={apiKeyInput} 
+                  onChange={e => setApiKeyInput(e.target.value)} 
+                  placeholder="请输入 API Key"
+                  style={{ paddingRight: '2.5rem' }}
+                />
+                <button 
+                  type="button" 
+                  onClick={() => setShowApiKey(!showApiKey)} 
+                  style={{ 
+                    position: 'absolute', 
+                    right: '0.5rem', 
+                    top: '50%', 
+                    transform: 'translateY(-50%)', 
+                    background: 'none', 
+                    border: 'none', 
+                    color: '#94a3b8', 
+                    cursor: 'pointer' 
+                  }}
+                >
+                  <Eye size={16} />
+                </button>
+              </div>
+            </FormField>
+            <p style={{ fontSize: '0.75rem', color: '#94a3b8', marginTop: '0.5rem' }}>
+              {editingModel.provider === 'runninghub' && '从 RunningHub 控制台获取 API Key'}
+              {editingModel.provider === 'huoshan' && '从火山引擎控制台获取 API Key'}
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
+            <button type="button" onClick={() => setShowModal(false)} className="btn-secondary" style={{ flex: 1 }}>取消</button>
+            <button type="button" onClick={handleSave} disabled={saving} className="btn-primary" style={{ flex: 1 }}>
+              {saving ? '保存中...' : '保存'}
+            </button>
+          </div>
+        </Modal>
+      )}
+    </div>
+  )
+}
   
   const currentItem = menuItems.find(item => item.key === activeTab)
   
@@ -198,13 +381,13 @@ export default function AdminDashboard() {
       {/* Main Content */}
       <main style={{ maxWidth: '1400px', margin: '0 auto', padding: '1.5rem' }}>
         {activeTab === 'dashboard' && <DashboardTab />}
-        {activeTab === 'skills' && <SkillsTab />}
+        {activeTab === 'ai-models' && <AiModelsTab />}
         {activeTab === 'endpoints' && <EndpointsTab />}
-        {activeTab === 'api-docs' && <ApiDocsTab />}
         {activeTab === 'invocations' && <InvocationsTab />}
         {activeTab === 'orders' && <OrdersTab />}
         {activeTab === 'users' && <UsersTab />}
         {activeTab === 'revenue' && <RevenueTab />}
+        {activeTab === 'redemption-codes' && <RedemptionCodesTab />}
         {activeTab === 'settings' && <SettingsTab />}
       </main>
     </div>
@@ -263,334 +446,6 @@ function DashboardTab() {
         )}
       </div>
     </div>
-  )
-}
-
-// ==================== Skills ====================
-
-function SkillsTab() {
-  const [skills, setSkills] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [showModal, setShowModal] = useState(false)
-  const [editSkill, setEditSkill] = useState(null)
-  const [search, setSearch] = useState('')
-  
-  useEffect(() => { fetchSkills() }, [])
-  
-  const fetchSkills = async () => {
-    try {
-      const res = await api.get('/admin/skills?limit=100')
-      setSkills(res.data.skills || [])
-    } catch (e) { console.error(e) }
-    finally { setLoading(false) }
-  }
-  
-  const handleDelete = async (skill) => {
-    if (!confirm(`确定删除 "${skill.name}" 吗？`)) return
-    try {
-      await api.delete(`/admin/skills/${skill.id}`)
-      fetchSkills()
-    } catch (e) { alert('删除失败') }
-  }
-  
-  const handleToggle = async (skill) => {
-    try {
-      await api.put(`/admin/skills/${skill.id}`, { isActive: !skill.isActive })
-      fetchSkills()
-    } catch (e) { alert('操作失败') }
-  }
-  
-  const filtered = skills.filter(s => 
-    s.name?.toLowerCase().includes(search.toLowerCase()) ||
-    s.category?.toLowerCase().includes(search.toLowerCase())
-  )
-  
-  return (
-    <div>
-      {/* Toolbar */}
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-        <SearchInput value={search} onChange={setSearch} placeholder="搜索 Skill..." style={{ flex: 1 }} />
-        <button onClick={() => { setEditSkill(null); setShowModal(true); }} className="btn-primary">
-          <Plus size={16} /> 新增
-        </button>
-      </div>
-      
-      {/* Table */}
-      <div className="card" style={{ padding: 0 }}>
-        {loading ? <LoadingSpinner /> : (
-          <Table
-            columns={[
-              { 
-                key: 'name', 
-                title: 'Skill',
-                render: r => (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    {r.icon ? (
-                      <img src={r.icon} alt="" style={{ width: '40px', height: '40px', borderRadius: '8px', objectFit: 'cover' }} />
-                    ) : (
-                      <div style={{ width: '40px', height: '40px', borderRadius: '8px', background: '#f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Package size={20} style={{ color: '#94a3b8' }} />
-                      </div>
-                    )}
-                    <div>
-                      <p style={{ fontWeight: 500, color: '#0f172a' }}>{r.name}</p>
-                      <p style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{r.category || '未分类'}</p>
-                    </div>
-                  </div>
-                )
-              },
-              { 
-                key: 'price', 
-                title: '价格',
-                align: 'right',
-                render: r => <span style={{ fontWeight: 500, color: '#6366f1' }}>¥{(r.pricePerCall / 100).toFixed(2)}</span>
-              },
-              { 
-                key: 'status', 
-                title: '状态',
-                render: r => (
-                  <span className={`badge ${r.isActive ? 'badge-success' : 'badge-default'}`}>
-                    {r.isActive ? '上架' : '下架'}
-                  </span>
-                )
-              },
-              { key: 'createdAt', title: '创建时间', render: r => dayjs(r.createdAt).format('YYYY-MM-DD') },
-              {
-                key: 'actions',
-                title: '',
-                align: 'right',
-                render: r => (
-                  <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                    <button onClick={() => { setEditSkill(r); setShowModal(true); }} className="btn-icon" title="编辑"><Edit2 size={16} /></button>
-                    <button onClick={() => handleToggle(r)} className="btn-icon" title={r.isActive ? '下架' : '上架'} style={{ color: r.isActive ? '#f59e0b' : '#22c55e' }}>
-                      {r.isActive ? <XCircle size={16} /> : <CheckCircle size={16} />}
-                    </button>
-                    <button onClick={() => handleDelete(r)} className="btn-icon" title="删除" style={{ color: '#ef4444' }}><Trash2 size={16} /></button>
-                  </div>
-                )
-              }
-            ]}
-            data={filtered}
-            emptyText="暂无 Skill"
-          />
-        )}
-      </div>
-      
-      {/* Modal */}
-      {showModal && (
-        <SkillModal 
-          skill={editSkill} 
-          onClose={() => setShowModal(false)} 
-          onSave={() => { setShowModal(false); fetchSkills(); }}
-        />
-      )}
-    </div>
-  )
-}
-
-function SkillModal({ skill, onClose, onSave }) {
-  const [form, setForm] = useState({
-    name: skill?.name || '',
-    description: skill?.description || '',
-    category: skill?.category || '',
-    pricePerCall: skill?.pricePerCall ? skill.pricePerCall / 100 : 1,
-    version: skill?.version || '1.0.0',
-    author: skill?.author || '',
-    readme: skill?.readme || '',
-    isActive: skill?.isActive ?? true
-  })
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState('')
-  const [packageFile, setPackageFile] = useState(null)
-  const [iconFile, setIconFile] = useState(null)
-  const [hasPackage, setHasPackage] = useState(!!skill?.packageUrl)
-  const [hasIcon, setHasIcon] = useState(!!skill?.icon)
-  
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (!form.name.trim()) {
-      setError('请输入名称')
-      return
-    }
-    setSaving(true)
-    setError('')
-    try {
-      const data = { ...form, pricePerCall: Math.round(form.pricePerCall * 100) }
-      let skillId = skill?.id
-      
-      if (skill) {
-        await api.put(`/admin/skills/${skill.id}`, data)
-      } else {
-        const res = await api.post('/admin/skills', data)
-        skillId = res.data.skill.id
-      }
-      
-      if (packageFile && skillId) {
-        const formData = new FormData()
-        formData.append('package', packageFile)
-        await api.post(`/admin/skills/${skillId}/upload`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        })
-      }
-      
-      if (iconFile && skillId) {
-        const formData = new FormData()
-        formData.append('icon', iconFile)
-        await api.post(`/admin/skills/${skillId}/icon`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        })
-      }
-      
-      onSave()
-    } catch (err) {
-      setError(err.response?.data?.error || '保存失败')
-    } finally {
-      setSaving(false)
-    }
-  }
-  
-  return (
-    <Modal title={skill ? '编辑 Skill' : '新增 Skill'} onClose={onClose}>
-      <form onSubmit={handleSubmit}>
-        {error && <div className="alert-error" style={{ marginBottom: '1rem' }}><AlertCircle size={16} /> {error}</div>}
-        
-        <FormField label="名称" required>
-          <input type="text" className="input" value={form.name} onChange={e => setForm({...form, name: e.target.value})} placeholder="Skill 名称" />
-        </FormField>
-        
-        <FormField label="描述">
-          <textarea className="input" value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="描述信息" style={{ minHeight: '80px', resize: 'vertical' }} />
-        </FormField>
-        
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-          <FormField label="分类">
-            <select className="input" value={form.category} onChange={e => setForm({...form, category: e.target.value})}>
-              <option value="">请选择分类</option>
-              <option value="productivity">效率工具</option>
-              <option value="ai">AI 助手</option>
-              <option value="developer">开发者</option>
-              <option value="creative">创意工具</option>
-            </select>
-          </FormField>
-          <FormField label="版本">
-            <input type="text" className="input" value={form.version} onChange={e => setForm({...form, version: e.target.value})} placeholder="1.0.0" />
-          </FormField>
-        </div>
-        
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-          <FormField label="单价 (元)" required>
-            <input type="number" step="0.01" min="0" className="input" value={form.pricePerCall} onChange={e => setForm({...form, pricePerCall: parseFloat(e.target.value) || 0})} />
-          </FormField>
-          <FormField label="作者">
-            <input type="text" className="input" value={form.author} onChange={e => setForm({...form, author: e.target.value})} placeholder="作者名称" />
-          </FormField>
-        </div>
-        
-        <FormField label="安装说明 (Markdown)">
-          <textarea className="input" value={form.readme} onChange={e => setForm({...form, readme: e.target.value})} placeholder="安装和使用说明..." style={{ minHeight: '60px', resize: 'vertical' }} />
-        </FormField>
-        
-        <FormField label="状态">
-          <select className="input" value={form.isActive ? 'true' : 'false'} onChange={e => setForm({...form, isActive: e.target.value === 'true'})}>
-            <option value="true">上架</option>
-            <option value="false">下架</option>
-          </select>
-        </FormField>
-        
-        <div style={{ marginTop: '1rem', padding: '1rem', background: '#f8fafc', borderRadius: '8px' }}>
-          <h4 style={{ fontSize: '0.875rem', fontWeight: 600, marginBottom: '0.75rem' }}>文件上传</h4>
-          
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>Skill 压缩包 (.zip)</label>
-            <div style={{ 
-              border: '2px dashed #e2e8f0', 
-              borderRadius: '8px', 
-              padding: '1rem',
-              textAlign: 'center',
-              background: packageFile ? '#f0fdf4' : 'white',
-              borderColor: packageFile ? '#22c55e' : '#e2e8f0'
-            }}>
-              <input 
-                type="file" 
-                accept=".zip" 
-                onChange={e => setPackageFile(e.target.files[0])}
-                style={{ display: 'none' }}
-                id="package-upload"
-              />
-              <label htmlFor="package-upload" style={{ cursor: 'pointer' }}>
-                {packageFile ? (
-                  <div>
-                    <Check size={24} style={{ color: '#22c55e', marginBottom: '0.5rem' }} />
-                    <p style={{ fontSize: '0.875rem', color: '#22c55e', fontWeight: 500 }}>{packageFile.name}</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>点击更换文件</p>
-                  </div>
-                ) : hasPackage ? (
-                  <div>
-                    <Check size={24} style={{ color: '#22c55e', marginBottom: '0.5rem' }} />
-                    <p style={{ fontSize: '0.875rem', color: '#22c55e', fontWeight: 500 }}>已上传</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>点击更换文件</p>
-                  </div>
-                ) : (
-                  <div>
-                    <Upload size={24} style={{ color: '#94a3b8', marginBottom: '0.5rem' }} />
-                    <p style={{ fontSize: '0.875rem', color: '#64748b' }}>点击或拖拽上传 .zip 文件</p>
-                    <p style={{ fontSize: '0.75rem', color: '#94a3b8' }}>最大 50MB</p>
-                  </div>
-                )}
-              </label>
-            </div>
-          </div>
-          
-          <div>
-            <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>图标图片</label>
-            <div style={{ 
-              border: '2px dashed #e2e8f0', 
-              borderRadius: '8px', 
-              padding: '1rem',
-              textAlign: 'center',
-              background: iconFile ? '#f0fdf4' : 'white',
-              borderColor: iconFile ? '#22c55e' : '#e2e8f0'
-            }}>
-              <input 
-                type="file" 
-                accept="image/*" 
-                onChange={e => setIconFile(e.target.files[0])}
-                style={{ display: 'none' }}
-                id="icon-upload"
-              />
-              <label htmlFor="icon-upload" style={{ cursor: 'pointer' }}>
-                {iconFile ? (
-                  <div>
-                    <Check size={24} style={{ color: '#22c55e', marginBottom: '0.5rem' }} />
-                    <p style={{ fontSize: '0.875rem', color: '#22c55e', fontWeight: 500 }}>{iconFile.name}</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>点击更换图片</p>
-                  </div>
-                ) : hasIcon ? (
-                  <div>
-                    <Check size={24} style={{ color: '#22c55e', marginBottom: '0.5rem' }} />
-                    <p style={{ fontSize: '0.875rem', color: '#22c55e', fontWeight: 500 }}>已上传</p>
-                    <p style={{ fontSize: '0.75rem', color: '#64748b' }}>点击更换图片</p>
-                  </div>
-                ) : (
-                  <div>
-                    <Upload size={24} style={{ color: '#94a3b8', marginBottom: '0.5rem' }} />
-                    <p style={{ fontSize: '0.875rem', color: '#64748b' }}>点击或拖拽上传图标</p>
-                    <p style={{ fontSize: '0.75rem', color: '#94a3b8' }}>支持 PNG, JPG, SVG</p>
-                  </div>
-                )}
-              </label>
-            </div>
-          </div>
-        </div>
-        
-        <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
-          <button type="button" onClick={onClose} className="btn-secondary" style={{ flex: 1 }}>取消</button>
-          <button type="submit" disabled={saving} className="btn-primary" style={{ flex: 1 }}>
-            {saving ? '保存中...' : '保存'}
-          </button>
-        </div>
-      </form>
-    </Modal>
   )
 }
 
@@ -914,15 +769,15 @@ function RevenueTab() {
         
         <div className="card" style={{ padding: '1.5rem' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>收入排行</h3>
-          {(stats?.topSkills || []).length === 0 ? (
+          {(stats?.topEndpoints || []).length === 0 ? (
             <EmptyState icon={Award} text="暂无数据" />
           ) : (
-            (stats?.topSkills || []).map((s, i) => (
-              <div key={s.skillId} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 0', borderBottom: '1px solid #f1f5f9' }}>
+            (stats?.topEndpoints || []).map((s, i) => (
+              <div key={s.endpointId || i} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.75rem 0', borderBottom: '1px solid #f1f5f9' }}>
                 <span style={{ width: '24px', height: '24px', borderRadius: '6px', background: i === 0 ? '#f59e0b' : i === 1 ? '#94a3b8' : '#cd7f32', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', fontWeight: 600 }}>{i + 1}</span>
                 <div style={{ flex: 1 }}>
                   <p style={{ fontWeight: 500, fontSize: '0.875rem' }}>{s.name}</p>
-                  <p style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{s.orderCount} 笔</p>
+                  <p style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{s.invocationCount || 0} 次调用</p>
                 </div>
                 <span style={{ fontWeight: 600, color: '#22c55e' }}>¥{(s.revenue / 100).toFixed(2)}</span>
               </div>
@@ -1485,9 +1340,10 @@ function EndpointModal({ endpoint, onClose, onSave }) {
     isActive: endpoint?.isActive ?? true,
     type: endpoint?.type || 'api',
     icon: endpoint?.icon || '',
-    defaultParams: endpoint?.defaultParams ? JSON.stringify(endpoint.defaultParams, null, 2) : '{\n  "aspectRatio": {"label": "画面比例", "value": "4:3", "options": [\n    { "value": "1:1", "label": "1:1" },\n    { "value": "4:3", "label": "4:3" },\n    { "value": "16:9", "label": "16:9" },\n    { "value": "3:4", "label": "3:4" },\n    { "value": "9:16", "label": "9:16" }\n  ]},\n  "imageSize": {"label": "分辨率", "value": "1K", "options": [\n    { "value": "1K", "label": "1K" },\n    { "value": "2K", "label": "2K" },\n    { "value": "4K", "label": "4K" }\n  ]},\n  "batchSize": {"label": "生成数量", "value": 1, "options": [\n    { "value": 1, "label": "1x" },\n    { "value": 2, "label": "2x" },\n    { "value": 4, "label": "4x" }\n  ]}\n}',
-    outputFields: endpoint?.outputFields ? JSON.stringify(endpoint.outputFields, null, 2) : '{\n  "result": "data.images[0].url",\n  "taskId": "task_id",\n  "status": "status"\n}',
-    showInGenerate: endpoint?.showInGenerate ?? false
+    defaultParams: endpoint?.defaultParams ? JSON.stringify(endpoint.defaultParams, null, 2) : '{\n  "aspectRatio": {"label": "画面比例", "value": "9:16", "options": [\n    { "value": "1:1", "label": "1:1" },\n    { "value": "16:9", "label": "16:9" },\n    { "value": "9:16", "label": "9:16" },\n    { "value": "4:3", "label": "4:3" },\n    { "value": "3:4", "label": "3:4" }\n  ]},\n  "resolution": {"label": "分辨率", "value": "1K", "options": [\n    { "value": "1K", "label": "1K" },\n    { "value": "2K", "label": "2K" },\n    { "value": "4K", "label": "4K" }\n  ]}\n}',
+    outputFields: endpoint?.outputFields ? JSON.stringify(endpoint.outputFields, null, 2) : '{\n  "taskId": "taskId",\n  "status": "status",\n  "result": "results[0].url"\n}',
+    showInGenerate: endpoint?.showInGenerate ?? false,
+    requestType: endpoint?.requestType || 'runninghub'
   })
   const [saving, setSaving] = useState(false)
   const [showAuthValue, setShowAuthValue] = useState(false)
@@ -1678,6 +1534,13 @@ function EndpointModal({ endpoint, onClose, onSave }) {
           </>
         )}
         
+        <FormField label="请求类型">
+          <select className="input" value={form.requestType} onChange={e => setForm({...form, requestType: e.target.value})}>
+            <option value="runninghub">RunningHub 格式 (使用 requestExample 转换请求)</option>
+            <option value="huoshan">火山引擎格式 (Google Gemini 兼容)</option>
+          </select>
+        </FormField>
+
         <FormField label="请求示例">
           <textarea className="input" value={form.requestExample} onChange={e => setForm({...form, requestExample: e.target.value})} placeholder='{"key": "value"} - 请求参数的示例' style={{ fontFamily: 'monospace', fontSize: '0.75rem', minHeight: '80px' }} />
         </FormField>
@@ -2494,6 +2357,362 @@ function ApiDocsTab() {
           )}
         </div>
       ))}
+    </div>
+  )
+}
+
+// ==================== Redemption Codes ====================
+
+function RedemptionCodesTab() {
+  const [codes, setCodes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [showCreateModal, setShowCreateModal] = useState(false)
+  const [createForm, setCreateForm] = useState({
+    amount: 100,
+    count: 1,
+    expiresAt: ''
+  })
+  const [creating, setCreating] = useState(false)
+  const [createdCodes, setCreatedCodes] = useState([])
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  
+  useEffect(() => { fetchCodes() }, [page])
+  
+  const fetchCodes = async () => {
+    setLoading(true)
+    try {
+      const res = await api.get('/coupon/list', { params: { page, pageSize: 20 } })
+      setCodes(res.data.coupons || [])
+      setTotalPages(res.data.pagination?.pages || 1)
+    } catch (err) {
+      console.error('Failed to fetch codes:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+  
+  const handleCreate = async () => {
+    setCreating(true)
+    try {
+      const res = await api.post('/coupon/create', {
+        amount: createForm.amount,
+        count: createForm.count,
+        expiresAt: createForm.expiresAt || null
+      })
+      setCreatedCodes(res.data.coupons || [])
+      fetchCodes()
+      setShowCreateModal(false)
+      setCreateForm({ amount: 100, count: 1, expiresAt: '' })
+    } catch (err) {
+      alert(err.response?.data?.error || '创建失败')
+    } finally {
+      setCreating(false)
+    }
+  }
+  
+  const copyToClipboard = (code) => {
+    navigator.clipboard.writeText(code)
+    alert('已复制到剪贴板')
+  }
+  
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 600 }}>兑换码管理</h2>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          style={{
+            padding: '0.75rem 1.5rem',
+            background: '#22c55e',
+            color: '#fff',
+            border: 'none',
+            borderRadius: '8px',
+            cursor: 'pointer',
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+          }}
+        >
+          <Plus size={20} />
+          生成兑换码
+        </button>
+      </div>
+      
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '2rem' }}>加载中...</div>
+      ) : codes.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
+          暂无兑换码
+        </div>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                <th style={{ textAlign: 'left', padding: '1rem', color: '#64748b', fontWeight: 500 }}>兑换码</th>
+                <th style={{ textAlign: 'left', padding: '1rem', color: '#64748b', fontWeight: 500 }}>积分</th>
+                <th style={{ textAlign: 'left', padding: '1rem', color: '#64748b', fontWeight: 500 }}>状态</th>
+                <th style={{ textAlign: 'left', padding: '1rem', color: '#64748b', fontWeight: 500 }}>有效期</th>
+                <th style={{ textAlign: 'left', padding: '1rem', color: '#64748b', fontWeight: 500 }}>创建时间</th>
+                <th style={{ textAlign: 'left', padding: '1rem', color: '#64748b', fontWeight: 500 }}>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {codes.map((code) => (
+                <tr key={code.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <td style={{ padding: '1rem', fontFamily: 'monospace', fontWeight: 600 }}>{code.code}</td>
+                  <td style={{ padding: '1rem', color: '#f59e0b', fontWeight: 600 }}>{code.amount}</td>
+                  <td style={{ padding: '1rem' }}>
+                    <span style={{
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.75rem',
+                      fontWeight: 500,
+                      background: code.is_active ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                      color: code.is_active ? '#22c55e' : '#ef4444'
+                    }}>
+                      {code.is_active ? '可用' : '已使用'}
+                    </span>
+                  </td>
+                  <td style={{ padding: '1rem', color: '#64748b' }}>
+                    {code.expires_at ? dayjs(code.expires_at).format('YYYY-MM-DD') : '永久有效'}
+                  </td>
+                  <td style={{ padding: '1rem', color: '#64748b' }}>
+                    {dayjs(code.created_at).format('YYYY-MM-DD HH:mm')}
+                  </td>
+                  <td style={{ padding: '1rem' }}>
+                    <button
+                      onClick={() => copyToClipboard(code.code)}
+                      style={{
+                        padding: '0.5rem',
+                        background: '#f1f5f9',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Copy size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      
+      {/* 分页 */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '2rem' }}>
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            style={{
+              padding: '0.5rem 1rem',
+              background: page === 1 ? '#e2e8f0' : '#f1f5f9',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: page === 1 ? 'not-allowed' : 'pointer'
+            }}
+          >
+            上一页
+          </button>
+          <span style={{ padding: '0.5rem' }}>第 {page} / {totalPages} 页</span>
+          <button
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            style={{
+              padding: '0.5rem 1rem',
+              background: page === totalPages ? '#e2e8f0' : '#f1f5f9',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: page === totalPages ? 'not-allowed' : 'pointer'
+            }}
+          >
+            下一页
+          </button>
+        </div>
+      )}
+      
+      {/* 创建弹窗 */}
+      {showCreateModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: '12px',
+            padding: '2rem',
+            width: '400px',
+            maxWidth: '90%'
+          }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.5rem' }}>生成兑换码</h3>
+            
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', color: '#64748b' }}>兑换积分</label>
+              <input
+                type="number"
+                value={createForm.amount}
+                onChange={(e) => setCreateForm({ ...createForm, amount: parseInt(e.target.value) || 0 })}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  fontSize: '1rem'
+                }}
+              />
+            </div>
+            
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', color: '#64748b' }}>生成数量</label>
+              <input
+                type="number"
+                value={createForm.count}
+                onChange={(e) => setCreateForm({ ...createForm, count: parseInt(e.target.value) || 1 })}
+                min={1}
+                max={100}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  fontSize: '1rem'
+                }}
+              />
+            </div>
+            
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', color: '#64748b' }}>有效期（可选）</label>
+              <input
+                type="date"
+                value={createForm.expiresAt}
+                onChange={(e) => setCreateForm({ ...createForm, expiresAt: e.target.value })}
+                style={{
+                  width: '100%',
+                  padding: '0.75rem',
+                  border: '1px solid #e2e8f0',
+                  borderRadius: '8px',
+                  fontSize: '1rem'
+                }}
+              />
+            </div>
+            
+            <div style={{ display: 'flex', gap: '1rem', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => { setShowCreateModal(false); setCreatedCodes([]); }}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: '#f1f5f9',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer'
+                }}
+              >
+                取消
+              </button>
+              <button
+                onClick={handleCreate}
+                disabled={creating || createForm.amount <= 0 || createForm.count <= 0}
+                style={{
+                  padding: '0.75rem 1.5rem',
+                  background: creating || createForm.amount <= 0 ? '#ccc' : '#22c55e',
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: creating || createForm.amount <= 0 ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {creating ? '生成中...' : '生成'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* 生成的兑换码 */}
+      {createdCodes.length > 0 && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }}>
+          <div style={{
+            background: '#fff',
+            borderRadius: '12px',
+            padding: '2rem',
+            width: '500px',
+            maxWidth: '90%'
+          }}>
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1rem' }}>兑换码已生成</h3>
+            <p style={{ color: '#64748b', marginBottom: '1rem' }}>共 {createdCodes.length} 个兑换码：</p>
+            <div style={{ 
+              maxHeight: '300px', 
+              overflow: 'auto', 
+              background: '#f8fafc',
+              padding: '1rem',
+              borderRadius: '8px',
+              marginBottom: '1rem'
+            }}>
+              {createdCodes.map((code, i) => (
+                <div key={i} style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  padding: '0.5rem 0',
+                  borderBottom: i < createdCodes.length - 1 ? '1px solid #e2e8f0' : 'none'
+                }}>
+                  <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{code.code}</span>
+                  <button
+                    onClick={() => copyToClipboard(code.code)}
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      background: '#e2e8f0',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Copy size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              onClick={() => setCreatedCodes([])}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                background: '#22c55e',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                fontWeight: 600
+              }}
+            >
+              关闭
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -60,16 +60,17 @@ const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [isReady, setIsReady] = useState(false)
-  const { _hasHydrated, token, refreshUser, setHasHydrated } = useAuthStore()
+  const { _hasHydrated, token, refreshUser, setHasHydrated, user } = useAuthStore()
 
   useEffect(() => {
     if (_hasHydrated) {
       setIsReady(true)
-      if (token) {
+      // 只有当 token 存在但 user 数据为空时才调用 refreshUser
+      if (token && !user) {
         refreshUser()
       }
     }
-  }, [_hasHydrated, token, refreshUser])
+  }, [_hasHydrated, token, refreshUser, user])
 
   if (!isReady && !_hasHydrated) {
     return (

@@ -154,10 +154,10 @@ function Payment() {
             <code style={{ fontSize: '0.875rem' }}>{order.orderNo}</code>
           </div>
           
-          {order.skill && (
+          {order.endpoint && (
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-              <span style={{ color: '#64748b' }}>Skill</span>
-              <span style={{ fontWeight: 500 }}>{order.skill.name}</span>
+              <span style={{ color: '#64748b' }}>API 端点</span>
+              <span style={{ fontWeight: 500 }}>{order.endpoint.name}</span>
             </div>
           )}
           

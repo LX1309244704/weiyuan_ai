@@ -1,9 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { v4: uuidv4 } = require('uuid');
 const jwt = require('jsonwebtoken');
-const { Order, User, Skill } = require('../models');
-const { redis, KEYS } = require('../config/redis');
+const { Order, User } = require('../models');
 
 const authenticate = async (req, res, next) => {
   try {
@@ -23,55 +21,42 @@ const authenticate = async (req, res, next) => {
   }
 };
 
+/**
+ * 创建订单
+ * POST /api/orders/create
+ */
 router.post('/create', authenticate, async (req, res, next) => {
   try {
-    const { skillId, packageSize, paymentMethod } = req.body;
+    const { packageSize, paymentMethod } = req.body;
     const userId = req.user.userId;
     
-    // Validate user
+    // 验证用户
     const user = await User.findByPk(userId);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }
     
-    // Determine price based on package size
-    let amount = 0;
-    if (skillId) {
-      const skill = await Skill.findByPk(skillId);
-      if (!skill) {
-        return res.status(404).json({ error: 'Skill not found' });
-      }
-      
-      const pkg = skill.packageSizes.find(p => p.size === packageSize);
-      if (!pkg) {
-        return res.status(400).json({ error: 'Invalid package size' });
-      }
-      amount = pkg.price;
-    } else {
-      // General balance purchase
-      amount = packageSize * 100; // 1 yuan per call
-    }
+    // 计算价格
+    const amount = packageSize * 100; // 1元/100积分
     
-    // Generate order number
+    // 生成订单号
     const orderNo = `ORD${Date.now()}${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
     
     const order = await Order.create({
-      orderNo,
       userId,
-      skillId: skillId || null,
       amount,
       packageSize,
-      paymentMethod,
+      paymentMethod: paymentMethod || 'wechat',
       status: 'pending'
     });
     
-    res.status(201).json({
+    res.json({
+      success: true,
       order: {
         id: order.id,
-        orderNo: order.orderNo,
-        amount: order.amount,
-        packageSize: order.packageSize,
-        paymentMethod: order.paymentMethod,
+        orderNo,
+        amount,
+        packageSize,
         status: order.status
       }
     });
@@ -80,20 +65,17 @@ router.post('/create', authenticate, async (req, res, next) => {
   }
 });
 
+/**
+ * 获取订单列表
+ * GET /api/orders
+ */
 router.get('/', authenticate, async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, status } = req.query;
-    
-    const where = { userId: req.user.userId };
-    if (status) where.status = status;
-    
+    const { page = 1, limit = 20 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
     
     const { count, rows } = await Order.findAndCountAll({
-      where,
-      include: [
-        { model: Skill, as: 'skill', attributes: ['id', 'name', 'icon'] }
-      ],
+      where: { userId: req.user.userId },
       order: [['created_at', 'DESC']],
       limit: parseInt(limit),
       offset
@@ -113,49 +95,21 @@ router.get('/', authenticate, async (req, res, next) => {
   }
 });
 
+/**
+ * 获取订单详情
+ * GET /api/orders/:id
+ */
 router.get('/:id', authenticate, async (req, res, next) => {
   try {
-    const { id } = req.params;
-    
-    const order = await Order.findByPk(id, {
-      include: [
-        { model: User, as: 'user', attributes: ['id', 'email', 'name'] },
-        { model: Skill, as: 'skill', attributes: ['id', 'name', 'icon'] }
-      ]
-    });
-    
-    if (!order) {
-      return res.status(404).json({ error: 'Order not found' });
-    }
-    
-    if (order.userId !== req.user.userId) {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    
-    res.json({ order });
-  } catch (error) {
-    next(error);
-  }
-});
-
-router.get('/no/:orderNo', authenticate, async (req, res, next) => {
-  try {
-    const { orderNo } = req.params;
-    
     const order = await Order.findOne({
-      where: { orderNo },
-      include: [
-        { model: User, as: 'user', attributes: ['id', 'email', 'name'] },
-        { model: Skill, as: 'skill', attributes: ['id', 'name', 'icon'] }
-      ]
+      where: { 
+        id: req.params.id,
+        userId: req.user.userId 
+      }
     });
     
     if (!order) {
       return res.status(404).json({ error: 'Order not found' });
-    }
-    
-    if (order.userId !== req.user.userId) {
-      return res.status(403).json({ error: 'Access denied' });
     }
     
     res.json({ order });

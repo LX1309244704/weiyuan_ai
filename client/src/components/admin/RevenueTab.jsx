@@ -144,17 +144,17 @@ export default function RevenueTab() {
           </div>
         </div>
         
-        {/* Top Skills */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+        {/* Top API Endpoints */}
+        {/* <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Skill 收入排行 TOP10</h3>
+            <h3 className="text-lg font-semibold text-gray-900">API 端点收入排行 TOP10</h3>
             <Award className="w-5 h-5 text-gray-400" />
           </div>
           
-          {stats?.topSkills?.length > 0 ? (
+          {stats?.topEndpoints?.length > 0 ? (
             <div className="space-y-3">
-              {stats.topSkills.map((skill, i) => (
-                <div key={skill.skillId} className="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 transition-colors">
+              {stats.topEndpoints.map((endpoint, i) => (
+                <div key={endpoint.endpointId} className="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 transition-colors">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
                     i === 0 ? 'bg-yellow-100 text-yellow-700' :
                     i === 1 ? 'bg-gray-100 text-gray-700' :
@@ -164,11 +164,11 @@ export default function RevenueTab() {
                     {i + 1}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 truncate">{skill.name}</p>
-                    <p className="text-sm text-gray-500">{skill.orderCount} 笔订单</p>
+                    <p className="font-medium text-gray-900 truncate">{endpoint.name}</p>
+                    <p className="text-sm text-gray-500">{endpoint.orderCount || endpoint.invocationCount} 次调用</p>
                   </div>
                   <div className="text-right">
-                    <p className="font-semibold text-green-600">¥{(skill.revenue / 100).toFixed(2)}</p>
+                    <p className="font-semibold text-green-600">¥{(endpoint.revenue / 100).toFixed(2)}</p>
                   </div>
                 </div>
               ))}

@@ -10,42 +10,53 @@ module.exports = (sequelize, DataTypes) => {
     invocationId: {
       type: DataTypes.STRING(64),
       allowNull: false,
-      unique: true
+      unique: true,
+      field: 'invocation_id'
     },
     userId: {
       type: DataTypes.UUID,
       allowNull: false,
+      field: 'user_id',
       references: {
         model: 'users',
         key: 'id'
       }
     },
-    skillId: {
-      type: DataTypes.UUID,
-      allowNull: false,
-      references: {
-        model: 'skills',
-        key: 'id'
-      }
+    model: {
+      type: DataTypes.STRING(100),
+      comment: '模型名称'
+    },
+    prompt: {
+      type: DataTypes.TEXT,
+      comment: '输入提示词'
+    },
+    response: {
+      type: DataTypes.TEXT,
+      comment: '模型响应'
+    },
+    tokensUsed: {
+      type: DataTypes.INTEGER,
+      field: 'tokens_used',
+      comment: '消耗的Token数量'
     },
     cost: {
       type: DataTypes.INTEGER,
-      defaultValue: 1,
-      validate: {
-        min: 1
-      }
+      defaultValue: 0,
+      comment: '消耗金额(分)'
     },
-    balanceAfter: {
+    duration: {
       type: DataTypes.INTEGER,
-      allowNull: false
+      comment: '响应耗时(毫秒)'
     },
     status: {
-      type: DataTypes.ENUM('success', 'failed'),
-      defaultValue: 'success'
+      type: DataTypes.STRING(20),
+      defaultValue: 'success',
+      comment: '调用状态'
     },
     errorMessage: {
       type: DataTypes.TEXT,
-      allowNull: true
+      allowNull: true,
+      field: 'error_message'
     }
   }, {
     tableName: 'invocations',

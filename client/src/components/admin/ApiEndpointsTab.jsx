@@ -24,7 +24,9 @@ function EndpointModal({ endpoint, onClose, onSave }) {
     icon: endpoint?.icon || '',
     defaultParams: endpoint?.defaultParams ? JSON.stringify(endpoint.defaultParams, null, 2) : '{\n  \n}',
     outputFields: endpoint?.outputFields ? JSON.stringify(endpoint.outputFields, null, 2) : '{\n  \n}',
-    isGenerateTool: endpoint?.isGenerateTool ?? false
+    isGenerateTool: endpoint?.isGenerateTool ?? false,
+    showInGenerate: endpoint?.showInGenerate ?? false,
+    requestType: endpoint?.requestType || 'runninghub'
   })
   const [saving, setSaving] = useState(false)
   const [showAuthValue, setShowAuthValue] = useState(false)
@@ -306,6 +308,18 @@ function EndpointModal({ endpoint, onClose, onSave }) {
                 />
                 是否为AI生成工具
               </label>
+            </div>
+
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">请求类型</label>
+              <select
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
+                value={form.requestType}
+                onChange={e => setForm({ ...form, requestType: e.target.value })}
+              >
+                <option value="runninghub">RunningHub 格式 (使用 requestExample 转换请求)</option>
+                <option value="huoshan">火山引擎格式 (Google Gemini 兼容)</option>
+              </select>
             </div>
 
             <div className="col-span-2">

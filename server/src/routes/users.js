@@ -33,7 +33,7 @@ const authenticate = async (req, res, next) => {
 router.get('/me', authenticate, async (req, res, next) => {
   try {
     const user = await User.findByPk(req.user.userId, {
-      attributes: ['id', 'email', 'name', 'apiKey', 'balance', 'totalPurchased', 'role', 'created_at']
+      attributes: ['id', 'email', 'username', 'apiKey', 'balance', 'role', 'created_at']
     });
     
     if (!user) {
@@ -116,27 +116,23 @@ router.get('/invocations', authenticate, async (req, res, next) => {
     
     const { count, rows } = await Invocation.findAndCountAll({
       where: { userId: req.user.userId },
-      include: [{
-        model: require('../models').Skill,
-        as: 'skill',
-        attributes: ['id', 'name', 'icon']
-      }],
       order: [['created_at', 'DESC']],
       limit: parseInt(limit),
       offset
     });
     
     res.json({
-      records: rows,
+      records: rows || [],
       pagination: {
-        total: count,
+        total: count || 0,
         page: parseInt(page),
         limit: parseInt(limit),
-        pages: Math.ceil(count / parseInt(limit))
+        pages: Math.ceil((count || 0) / parseInt(limit))
       }
     });
   } catch (error) {
-    next(error);
+    console.error('[Invocations] Error:', error.message);
+    res.json({ records: [], pagination: { total: 0, page: 1, limit: 20, pages: 0 } });
   }
 });
 
@@ -162,16 +158,17 @@ router.get('/api-invocations', authenticate, async (req, res, next) => {
     });
     
     res.json({
-      records: rows,
+      records: rows || [],
       pagination: {
-        total: count,
+        total: count || 0,
         page: parseInt(page),
         limit: parseInt(limit),
-        pages: Math.ceil(count / parseInt(limit))
+        pages: Math.ceil((count || 0) / parseInt(limit))
       }
     });
   } catch (error) {
-    next(error);
+    console.error('[ApiInvocations] Error:', error.message);
+    res.json({ records: [], pagination: { total: 0, page: 1, limit: 20, pages: 0 } });
   }
 });
 
@@ -188,20 +185,22 @@ router.get('/orders', authenticate, async (req, res, next) => {
       where: { userId: req.user.userId },
       order: [['created_at', 'DESC']],
       limit: parseInt(limit),
-      offset
+      offset,
+      attributes: { exclude: ['skillId'] }
     });
     
     res.json({
-      orders: rows,
+      orders: rows || [],
       pagination: {
-        total: count,
+        total: count || 0,
         page: parseInt(page),
         limit: parseInt(limit),
-        pages: Math.ceil(count / parseInt(limit))
+        pages: Math.ceil((count || 0) / parseInt(limit))
       }
     });
   } catch (error) {
-    next(error);
+    console.error('[Orders] Error:', error.message);
+    res.json({ orders: [], pagination: { total: 0, page: 1, limit: 20, pages: 0 } });
   }
 });
 

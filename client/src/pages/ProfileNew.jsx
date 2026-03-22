@@ -4,6 +4,36 @@ import { Key, Wallet, ShoppingCart, Zap, Copy, RefreshCw, TrendingUp, TrendingDo
 import { useAuthStore } from '../context/AuthContext'
 import api from '../utils/api'
 import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
+import timezone from 'dayjs/plugin/timezone'
+
+dayjs.extend(utc)
+dayjs.extend(timezone)
+
+// 创建带时区的 dayjs 实例
+const formatTime = (log) => {
+  const date = log?.createdAt || log?.created_at
+  if (!date) return '--'
+  try {
+    const d = dayjs(date)
+    if (!d.isValid()) return '--'
+    return d.format('MM-DD HH:mm')
+  } catch {
+    return '--'
+  }
+}
+
+const formatDate = (log) => {
+  const date = log?.createdAt || log?.created_at
+  if (!date) return '--'
+  try {
+    const d = dayjs(date)
+    if (!d.isValid()) return '--'
+    return d.format('YYYY-MM-DD')
+  } catch {
+    return '--'
+  }
+}
 import TopNavigationBar from '../components/TopNavigationBar'
 import '../styles/generate.css'
 
@@ -490,7 +520,7 @@ function ProfileNew() {
                               <td style={{ padding: '1rem 0.75rem', color: 'var(--ai-text-secondary)' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                                   <Clock size={14} />
-                                  {dayjs(log.createdAt).format('MM-DD HH:mm')}
+                                  {formatTime(log)}
                                 </div>
                               </td>
                               <td style={{ padding: '1rem 0.75rem' }}>
@@ -505,7 +535,28 @@ function ProfileNew() {
                                   {log.change > 0 ? '+' : ''}{log.change}
                                 </span>
                               </td>
-                              <td style={{ padding: '1rem 0.75rem', color: 'var(--ai-text-primary)' }}>{log.reason}</td>
+                              <td style={{ padding: '1rem 0.75rem', color: 'var(--ai-text-primary)' }}>
+                                {(() => {
+                                  const reason = log.reason || '余额变动'
+                                  if (reason.includes('充值')) return '账户充值'
+                                  if (reason.includes('退款')) return '退款返还'
+                                  if (reason.includes('激活码')) return '激活码兑换'
+                                  if (reason.includes('AI生成')) {
+                                    const match = reason.match(/AI生成 \(([^)]+)\)/)
+                                    if (match) {
+                                      const modelId = match[1]
+                                      const modelName = modelId.includes('/') ? modelId.split('/')[1] : modelId
+                                      const displayNames = {
+                                        'nanobanana': '香蕉Pro',
+                                        'veo31': 'VEO3.1视频生成'
+                                      }
+                                      return displayNames[modelName] || modelName
+                                    }
+                                    return 'AI创作'
+                                  }
+                                  return reason
+                                })()}
+                              </td>
                               <td style={{ padding: '1rem 0.75rem', textAlign: 'right', fontWeight: 500, color: 'var(--ai-accent-green)' }}>
                                 {log.balanceAfter}
                               </td>
@@ -627,7 +678,7 @@ function ProfileNew() {
                                 </span>
                               </td>
                               <td style={{ padding: '1rem 0.75rem', textAlign: 'right', color: 'var(--ai-text-secondary)' }}>
-                                {dayjs(order.createdAt).format('YYYY-MM-DD')}
+                                {formatDate(order)}
                               </td>
                             </tr>
                           )
@@ -679,7 +730,7 @@ function ProfileNew() {
                                 background: inv.type === 'api' ? 'rgba(96, 165, 250, 0.2)' : 'rgba(74, 222, 128, 0.2)',
                                 color: inv.type === 'api' ? 'var(--ai-accent-blue)' : 'var(--ai-accent-green)'
                               }}>
-                                {inv.type === 'api' ? 'API' : 'Skill'}
+                                {inv.type === 'api' ? 'API' : 'API'}
                               </span>
                             </td>
                             <td style={{ padding: '1rem 0.75rem', fontWeight: 500, color: 'var(--ai-text-primary)' }}>
@@ -708,7 +759,7 @@ function ProfileNew() {
                               </span>
                             </td>
                             <td style={{ padding: '1rem 0.75rem', textAlign: 'right', color: 'var(--ai-text-secondary)' }}>
-                              {dayjs(inv.createdAt).format('MM-DD HH:mm')}
+                              {formatTime(inv)}
                             </td>
                           </tr>
                         ))}

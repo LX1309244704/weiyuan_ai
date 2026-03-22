@@ -1,86 +1,116 @@
 import { useState } from 'react'
 import { Settings2 } from 'lucide-react'
 
+// 默认参数配置（当没有 paramConfig 时使用）
 const IMAGE_RESOLUTIONS = [
-  { value: '4K', label: '4K 超清' },
-  { value: '2K', label: '2K 高清' },
-  { value: '1K', label: '1K 标准' }
+  { value: '2k', label: '2K 高清' },
+  { value: '1k', label: '1K 标准' },
+  { value: '4k', label: '4K 超清' }
 ]
 
 const IMAGE_ASPECT_RATIOS = [
-  { value: '3:4', label: '3:4', desc: '竖版' },
-  { value: '16:9', label: '16:9', desc: '横向' },
   { value: '1:1', label: '1:1', desc: '正方形' },
-  { value: '9:16', label: '9:16', desc: '纵向' },
-  { value: '4:3', label: '4:3', desc: '标准' }
+  { value: '3:4', label: '3:4', desc: '竖版' },
+  { value: '4:3', label: '4:3', desc: '横版' },
+  { value: '9:16', label: '9:16', desc: '手机竖版' },
+  { value: '16:9', label: '16:9', desc: '横屏' }
 ]
 
-const IMAGE_COUNTS = [1, 2, 4]
-
-const VIDEO_RESOLUTIONS = [
-  { value: '1080P', label: '1080P' },
-  { value: '720P', label: '720P' }
-]
-
-const VIDEO_DURATIONS = [
-  { value: 5, label: '5 秒' },
-  { value: 10, label: '10 秒' },
-  { value: 15, label: '15 秒' }
-]
-
-const VIDEO_FPS = [24, 30, 60]
-
-function ParamOptionGroup({ label, paramKey, paramConfig, currentValue, onChange }) {
-  if (!paramConfig || !paramConfig.options) return null
+/**
+ * 渲染不同类型的参数输入控件
+ */
+function ParamInput({ config, value, onChange }) {
+  const { type, name, label, options, placeholder, min, max, step, description } = config
   
-  const displayLabel = paramConfig.label || label
-  const options = (paramConfig.options || []).map(opt => {
-    if (typeof opt === 'object') {
-      return { value: opt.value, label: opt.label }
-    }
-    return { value: opt, label: String(opt) }
-  })
-  
-  const defaultValue = paramConfig.default || options[0]?.value
-  const current = currentValue !== undefined ? currentValue : defaultValue
-  
-  return (
-    <div className="ai-param-item">
-      <label className="ai-param-label">{displayLabel}</label>
-      <div className="ai-param-options">
-        {options.map((opt) => (
-          <div
-            key={opt.value}
-            className={`ai-param-option ${String(current) === String(opt.value) ? 'selected' : ''}`}
-            onClick={() => onChange(paramKey, opt.value)}
-          >
-            {opt.label}
+  switch (type) {
+    case 'select':
+      return (
+        <div className="ai-param-item">
+          <label className="ai-param-label">{label}</label>
+          {description && <div className="ai-param-desc">{description}</div>}
+          <div className="ai-param-options">
+            {(options || []).map((opt) => {
+              const optValue = typeof opt === 'object' ? opt.value : opt
+              const optLabel = typeof opt === 'object' ? opt.label : String(opt)
+              return (
+                <div
+                  key={optValue}
+                  className={`ai-param-option ${String(value) === String(optValue) ? 'selected' : ''}`}
+                  onClick={() => onChange(name, optValue)}
+                >
+                  {optLabel}
+                </div>
+              )
+            })}
           </div>
-        ))}
-      </div>
-    </div>
-  )
+        </div>
+      )
+      
+    case 'number':
+      return (
+        <div className="ai-param-item">
+          <label className="ai-param-label">{label}</label>
+          {description && <div className="ai-param-desc">{description}</div>}
+          <input
+            type="number"
+            className="ai-param-input"
+            value={value || ''}
+            onChange={(e) => onChange(name, e.target.value ? parseInt(e.target.value) : undefined)}
+            placeholder={placeholder}
+            min={min}
+            max={max}
+          />
+        </div>
+      )
+      
+    case 'slider':
+      return (
+        <div className="ai-param-item">
+          <label className="ai-param-label">
+            {label}: {value ?? config.default ?? min ?? 0}
+          </label>
+          {description && <div className="ai-param-desc">{description}</div>}
+          <input
+            type="range"
+            className="ai-param-slider"
+            value={value ?? config.default ?? min ?? 0}
+            onChange={(e) => onChange(name, parseFloat(e.target.value))}
+            min={min ?? 0}
+            max={max ?? 1}
+            step={step ?? 0.1}
+          />
+        </div>
+      )
+      
+    case 'text':
+      return (
+        <div className="ai-param-item">
+          <label className="ai-param-label">{label}</label>
+          {description && <div className="ai-param-desc">{description}</div>}
+          <input
+            type="text"
+            className="ai-param-input"
+            value={value || ''}
+            onChange={(e) => onChange(name, e.target.value)}
+            placeholder={placeholder}
+          />
+        </div>
+      )
+      
+    default:
+      return null
+  }
 }
 
-export default function ParamPanel({ modelType, params, onChange, customParams }) {
+export default function ParamPanel({ modelType, params, onChange, paramConfig = [] }) {
   const isVideo = modelType === 'video'
-  
-  const hasCustomParams = customParams && Object.keys(customParams).length > 0
-  
-  const currentResolutions = isVideo ? VIDEO_RESOLUTIONS : IMAGE_RESOLUTIONS
-  const currentParams = isVideo ? {
-    resolution: params.resolution || '1080P',
-    duration: params.duration || 5,
-    fps: params.fps || 24
-  } : {
-    resolution: params.resolution || '2K',
-    aspectRatio: params.aspectRatio || '3:4',
-    numImages: params.numImages || 2
-  }
   
   const updateParam = (key, value) => {
     onChange?.({ ...params, [key]: value })
   }
+  
+  // 如果有 paramConfig，使用它渲染参数
+  const hasParamConfig = paramConfig && paramConfig.length > 0
   
   return (
     <div className="ai-param-section">
@@ -92,62 +122,47 @@ export default function ParamPanel({ modelType, params, onChange, customParams }
       </div>
       
       <div className="ai-param-grid">
-        {hasCustomParams ? (
-          Object.entries(customParams).map(([key, config]) => (
-            <ParamOptionGroup
-              key={key}
-              label={key}
-              paramKey={key}
-              paramConfig={config}
-              currentValue={params[key]}
+        {hasParamConfig ? (
+          // 使用 paramConfig 渲染参数
+          paramConfig.map((config) => (
+            <ParamInput
+              key={config.name}
+              config={config}
+              value={params[config.name] ?? config.default}
               onChange={updateParam}
             />
           ))
         ) : (
+          // 默认参数配置
           <>
-            <div className="ai-param-item">
-              <label className="ai-param-label">分辨率</label>
-              <div className="ai-param-options">
-                {currentResolutions.map((res) => (
-                  <div
-                    key={res.value}
-                    className={`ai-param-option ${currentParams.resolution === res.value ? 'selected' : ''}`}
-                    onClick={() => updateParam('resolution', res.value)}
-                  >
-                    {res.label}
-                  </div>
-                ))}
-              </div>
-            </div>
-            
             {!isVideo && (
               <>
                 <div className="ai-param-item">
-                  <label className="ai-param-label">画面比例</label>
-                  <div className="ai-param-options" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
-                    {IMAGE_ASPECT_RATIOS.map((ratio) => (
+                  <label className="ai-param-label">分辨率</label>
+                  <div className="ai-param-options">
+                    {IMAGE_RESOLUTIONS.map((res) => (
                       <div
-                        key={ratio.value}
-                        className={`ai-param-option ${currentParams.aspectRatio === ratio.value ? 'selected' : ''}`}
-                        onClick={() => updateParam('aspectRatio', ratio.value)}
-                        title={ratio.desc}
+                        key={res.value}
+                        className={`ai-param-option ${params.resolution === res.value ? 'selected' : ''}`}
+                        onClick={() => updateParam('resolution', res.value)}
                       >
-                        {ratio.label}
+                        {res.label}
                       </div>
                     ))}
                   </div>
                 </div>
                 
                 <div className="ai-param-item">
-                  <label className="ai-param-label">生成数量</label>
-                  <div className="ai-param-options">
-                    {IMAGE_COUNTS.map((count) => (
+                  <label className="ai-param-label">画面比例</label>
+                  <div className="ai-param-options" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}>
+                    {IMAGE_ASPECT_RATIOS.map((ratio) => (
                       <div
-                        key={count}
-                        className={`ai-param-option ${currentParams.numImages === count ? 'selected' : ''}`}
-                        onClick={() => updateParam('numImages', count)}
+                        key={ratio.value}
+                        className={`ai-param-option ${params.aspectRatio === ratio.value ? 'selected' : ''}`}
+                        onClick={() => updateParam('aspectRatio', ratio.value)}
+                        title={ratio.desc}
                       >
-                        {count}张
+                        {ratio.label}
                       </div>
                     ))}
                   </div>
@@ -158,30 +173,30 @@ export default function ParamPanel({ modelType, params, onChange, customParams }
             {isVideo && (
               <>
                 <div className="ai-param-item">
-                  <label className="ai-param-label">视频时长</label>
+                  <label className="ai-param-label">分辨率</label>
                   <div className="ai-param-options">
-                    {VIDEO_DURATIONS.map((dur) => (
+                    {['1080P', '720P'].map((res) => (
                       <div
-                        key={dur.value}
-                        className={`ai-param-option ${currentParams.duration === dur.value ? 'selected' : ''}`}
-                        onClick={() => updateParam('duration', dur.value)}
+                        key={res}
+                        className={`ai-param-option ${params.resolution === res ? 'selected' : ''}`}
+                        onClick={() => updateParam('resolution', res)}
                       >
-                        {dur.label}
+                        {res}
                       </div>
                     ))}
                   </div>
                 </div>
                 
                 <div className="ai-param-item">
-                  <label className="ai-param-label">帧率 (FPS)</label>
+                  <label className="ai-param-label">视频时长</label>
                   <div className="ai-param-options">
-                    {VIDEO_FPS.map((fps) => (
+                    {[5, 10, 15].map((dur) => (
                       <div
-                        key={fps}
-                        className={`ai-param-option ${currentParams.fps === fps ? 'selected' : ''}`}
-                        onClick={() => updateParam('fps', fps)}
+                        key={dur}
+                        className={`ai-param-option ${params.duration === dur ? 'selected' : ''}`}
+                        onClick={() => updateParam('duration', dur)}
                       >
-                        {fps}
+                        {dur} 秒
                       </div>
                     ))}
                   </div>

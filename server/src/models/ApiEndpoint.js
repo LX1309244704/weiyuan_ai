@@ -48,6 +48,11 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: {},
       comment: '请求头映射配置'
     },
+    requestType: {
+      type: DataTypes.ENUM('runninghub', 'huoshan'),
+      defaultValue: 'runninghub',
+      comment: '请求类型: runninghub=RunningHub格式, huoshan=火山引擎格式'
+    },
     requestExample: {
       type: DataTypes.TEXT,
       allowNull: true,

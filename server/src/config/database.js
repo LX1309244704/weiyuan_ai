@@ -1,19 +1,19 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../../.env') });
 
 module.exports = {
   development: {
     username: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'skill_marketplace',
+    database: process.env.DB_NAME || 'weiyuan_ai',
     host: process.env.DB_HOST || 'localhost',
     port: process.env.DB_PORT || 3306,
     dialect: 'mysql',
     logging: console.log,
     pool: {
-      max: 20,
-      min: 5,
+      max: 50,
+      min: 10,
       acquire: 30000,
-      idle: 10000
+      idle: 15000
     }
   },
   production: {
@@ -27,8 +27,8 @@ module.exports = {
     pool: {
       max: 50,
       min: 10,
-      acquire: 60000,
-      idle: 10000
+      acquire: 30000,
+      idle: 15000
     }
   }
 };

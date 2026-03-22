@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../context/AuthContext'
 import api from '../utils/api'
@@ -11,87 +11,41 @@ import PreviewArea from '../components/generate/PreviewArea'
 import { Zap, Loader2, Sparkles } from 'lucide-react'
 import '../styles/generate.css'
 
-const DEFAULT_MODELS = [
-  { 
-    id: 'gemini-3-pro-image', 
-    name: 'Gemini 3 Pro 图片', 
-    description: '强化一致性，自由多参考图，全面效果升级',
-    type: 'image',
-    icon: '🖼️',
-    isBuiltIn: false,
-    endpointId: null,
-    pathPrefix: 'gemini-3-pro-image',
-    defaultParams: {
-      resolution: '2K',
-      aspectRatio: '3:4',
-      numImages: 2
-    }
-  },
-  { 
-    id: 'veo3.1', 
-    name: 'Veo 3.1 视频', 
-    description: '高质量视频生成',
-    type: 'video',
-    icon: '🎬',
-    isBuiltIn: false,
-    endpointId: null,
-    pathPrefix: 'veo3.1',
-    defaultParams: {
-      resolution: '1080P',
-      duration: 5,
-      fps: 24
-    }
-  },
-  { 
-    id: 'grok3.1', 
-    name: 'Grok 3.1 视频', 
-    description: 'Grok AI 视频生成',
-    type: 'video',
-    icon: '🎬',
-    isBuiltIn: false,
-    endpointId: null,
-    pathPrefix: 'grok3.1',
-    defaultParams: {
-      resolution: '1080P',
-      duration: 5,
-      fps: 24
-    }
-  }
-]
+const DEFAULT_MODELS = []
 
 export default function GenerateNew() {
   const navigate = useNavigate()
-  const { user, isAuthenticated } = useAuthStore()
+  const { user, isAuthenticated, token } = useAuthStore()
   
-  const [models, setModels] = useState(DEFAULT_MODELS)
-  const [selectedModel, setSelectedModel] = useState(DEFAULT_MODELS[0])
+  const [models, setModels] = useState([])
+  const [selectedModel, setSelectedModel] = useState(null)
   const [prompt, setPrompt] = useState('')
   const [referenceImages, setReferenceImages] = useState([])
-  const [params, setParams] = useState(DEFAULT_MODELS[0].defaultParams)
+  const [params, setParams] = useState({})
   
   const [generating, setGenerating] = useState(false)
   const [progress, setProgress] = useState(0)
   const [estimatedTime, setEstimatedTime] = useState(null)
   const [results, setResults] = useState([])
   const [error, setError] = useState(null)
-  const [currentTaskId, setCurrentTaskId] = useState(null)
+  const [tasks, setTasks] = useState([])
   
-const [tools, setTools] = useState([])
-  const [selectedTool, setSelectedTool] = useState([])
   const [userApiKey, setUserApiKey] = useState('')
-  const [token, setToken] = useState('')
-   
+  const [balance, setBalance] = useState(0)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+    
   useEffect(() => {
     fetchApiEndpoints()
-    fetchTools()
     if (isAuthenticated) {
       fetchUserApiKey()
-      const storedToken = localStorage.getItem('token')
-      if (storedToken) {
-        setToken(storedToken)
-      }
     }
   }, [])
+  
+  useEffect(() => {
+    if (user?.balance !== undefined) {
+      setBalance(user.balance)
+    }
+  }, [user])
   
   const fetchUserApiKey = async () => {
     try {
@@ -99,7 +53,10 @@ const [tools, setTools] = useState([])
       if (res.data.user?.apiKey) {
         setUserApiKey(res.data.user.apiKey)
       }
-} catch (err) {
+      if (res.data.user?.balance !== undefined) {
+        setBalance(res.data.user.balance)
+      }
+    } catch (err) {
         console.error('Failed to fetch user API key:', err)
       }
     }
@@ -120,9 +77,12 @@ const [tools, setTools] = useState([])
           isBuiltIn: false,
           pathPrefix: m.pathPrefix,
           defaultParams: m.defaultParams || {},
+          paramConfig: m.paramConfig || [],  // 参数配置
           pricePerCall: m.pricePerCall
         }))
         setModels(formattedModels)
+        setSelectedModel(formattedModels[0])
+        setParams(formattedModels[0].defaultParams || {})
       }
     } catch (err) {
       console.error('Failed to fetch AI Generate models:', err)
@@ -131,18 +91,18 @@ const [tools, setTools] = useState([])
   }
   
   useEffect(() => {
-    if (selectedModel) {
+    if (selectedModel && selectedModel.defaultParams) {
       const defaultParams = selectedModel.defaultParams || {}
       
       const hasStructuredParams = Object.values(defaultParams).some(
         val => val && typeof val === 'object' && val.options
       )
       
-      if (!selectedModel.isBuiltIn && hasStructuredParams) {
+      if (hasStructuredParams) {
         const customParams = defaultParams
         const initialParams = {}
         Object.entries(customParams).forEach(([key, config]) => {
-          initialParams[key] = config.default || config.options?.[0]?.value
+          initialParams[key] = config.value || config.default || config.options?.[0]?.value
         })
         setParams(initialParams)
       } else {
@@ -154,30 +114,48 @@ const [tools, setTools] = useState([])
         })
         setParams(simpleParams)
       }
-      
-      if (!selectedModel.isBuiltIn) {
-        setTools([])
-        setSelectedTool(null)
-      } else {
-        fetchTools(selectedModel.type)
-      }
     }
   }, [selectedModel])
   
-  const fetchTools = async (type) => {
-    if (!type) return
-    try {
-      const response = await api.get(`/generate/tools?type=${type}`)
-      const toolsList = response.data.tools || []
-      setTools(toolsList)
-      
-      if (toolsList.length > 0 && !selectedTool) {
-        setSelectedTool(toolsList[0])
+  // 处理从预览区拖拽添加参考图
+  const handleAddReference = useCallback((items) => {
+    const newImages = items.map(item => {
+      if (item.url && !item.file) {
+        // URL 对象（从外部拖入的图片链接）
+        return {
+          id: `url_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          url: item.url,
+          name: item.name,
+          type: item.type
+        }
       }
-    } catch (err) {
-      console.error('Failed to fetch tools:', err)
+      // File 对象（本地文件）
+      return {
+        id: `local_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        file: item,
+        url: URL.createObjectURL(item),
+        name: item.name,
+        type: item.type
+      }
+    })
+    setReferenceImages(prev => [...prev, ...newImages])
+  }, [])
+  
+  // 处理从历史图片添加 URL 参考图
+  const handleAddReferenceUrl = useCallback((url) => {
+    const newImage = {
+      id: `url_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      url: url,
+      name: url.split('/').pop() || 'image',
+      type: 'image/*'
     }
-  }
+    setReferenceImages(prev => [...prev, newImage])
+  }, [])
+  
+  // 处理使用历史提示词
+  const handleUsePrompt = useCallback((prompt) => {
+    setPrompt(prompt)
+  }, [])
   
   const handleGenerate = useCallback(async () => {
     if (!isAuthenticated) {
@@ -191,163 +169,94 @@ const [tools, setTools] = useState([])
       return
     }
     
-    const isApiEndpoint = !selectedModel?.isBuiltIn
-    
-    if (isApiEndpoint) {
-      if (!selectedModel?.pathPrefix && !selectedModel?.endpointId) {
-        alert('请选择模型')
-        return
-      }
-    } else {
-      if (!selectedTool) {
-        alert('请选择生成工具')
-        return
-      }
+    if (!selectedModel?.pathPrefix) {
+      alert('请选择模型')
+      return
     }
     
-    setGenerating(true)
-    setProgress(0)
-    setResults([])
+    const currentPrompt = prompt.trim()
+    const currentImages = [...referenceImages]
+    const currentParams = { ...params }
+    
+    // 防重复点击
+    if (isSubmitting) return
+    setIsSubmitting(true)
+    
+    // 立即重置表单，用户可以继续输入
+    setPrompt('')
+    setReferenceImages([])
     setError(null)
     
-    const startTime = Date.now()
-    const estimatedTotal = selectedModel?.type === 'video' ? 60 : 30
-    
-    const progressInterval = setInterval(() => {
-      setProgress(prev => {
-        const newProgress = prev + (100 / (estimatedTotal * 10))
-        return Math.min(newProgress, 90)
-      })
-    }, 100)
-    
-    const timeInterval = setInterval(() => {
-      const elapsed = (Date.now() - startTime) / 1000
-      const remaining = Math.max(0, estimatedTotal - elapsed)
-      setEstimatedTime(Math.ceil(remaining))
-    }, 500)
+    // 添加新任务到列表（只在 GenerateNew 本地显示）
+    const newTask = {
+      taskId: `pending_${Date.now()}`,
+      prompt: currentPrompt,
+      modelName: selectedModel.name,
+      status: 'queued',
+      progress: 0,
+      createdAt: new Date()
+    }
+    setTasks(prev => [newTask, ...prev])
     
     try {
-      let response
-      let isAsyncTask = false
-      
-      const isApiEndpoint = !selectedModel?.isBuiltIn
-      
-      if (isApiEndpoint) {
-        console.log('Calling API endpoint:', selectedModel.pathPrefix)
-        console.log('Request params:', params)
-        
-        const requestBody = {
-          prompt: prompt.trim(),
-          ...params
-        }
-        
-        if (referenceImages.length > 0) {
-          requestBody.imageUrls = referenceImages.map(img => img.url)
-        }
-        
-        console.log('Request body:', requestBody)
-        
-        response = await api.post(`/ai-generate/${selectedModel.pathPrefix}`, requestBody, {
-          headers: userApiKey ? { 'X-API-Key': userApiKey } : {}
-        })
-        console.log('API response:', response.data)
-      } else {
-        const imageUrls = referenceImages.map(img => img.url)
-        
-        response = await api.post('/generate/generate', {
-          toolId: selectedTool.id,
-          prompt: prompt.trim(),
-          imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
-          parameters: params
-        })
+      const requestBody = {
+        prompt: currentPrompt,
+        ...currentParams
       }
       
-      clearInterval(progressInterval)
-      clearInterval(timeInterval)
+      if (currentImages.length > 0) {
+        requestBody.imageUrls = currentImages.map(img => img.url)
+      }
       
-      let hasResult = false
+      const response = await api.post(`/ai-generate/${selectedModel.pathPrefix}`, requestBody, {
+        headers: userApiKey ? { 'X-API-Key': userApiKey } : {}
+      })
       
-      if (isApiEndpoint) {
-        if (response.data.success || response.status === 200) {
-          if (response.data.taskId) {
-            isAsyncTask = true
-            setCurrentTaskId(response.data.taskId)
-            setProgress(0)
-            setGenerating(true)
-            console.log('Task submitted, taskId:', response.data.taskId)
-          } else if (response.data.data) {
-            setProgress(100)
-            
-            const resultUrls = []
-            
-            if (response.data.data) {
-              if (Array.isArray(response.data.data)) {
-                resultUrls.push(...response.data.data.map(url => ({ url })))
-              } else if (typeof response.data.data === 'string') {
-                resultUrls.push({ url: response.data.data })
-              } else if (response.data.data.url) {
-                resultUrls.push({ url: response.data.data.url })
-              } else if (response.data.data.result) {
-                if (Array.isArray(response.data.data.result)) {
-                  resultUrls.push(...response.data.data.result.map(url => ({ url })))
-                } else {
-                  resultUrls.push({ url: response.data.data.result })
-                }
-              }
-            }
-            
-            if (resultUrls.length > 0) {
-              setResults(resultUrls)
-              hasResult = true
-            }
+      const data = response.data
+      
+      if (data.success || response.status === 200) {
+        if (data.taskId) {
+          const taskStatus = data.status || 'queued'
+          const resultUrl = data.resultUrl || data.result?.[0] || null
+          // 更新本地任务
+          setTasks(prev => prev.map(t => 
+            t.taskId === newTask.taskId 
+              ? { ...t, taskId: data.taskId, realTaskId: data.taskId, status: resultUrl ? 'completed' : taskStatus, progress: resultUrl ? 100 : 0, resultUrl }
+              : t
+          ))
+          if (data.balance !== undefined) {
+            setBalance(data.balance)
           }
-        }
-        
-        if (!hasResult && !response.data.taskId) {
-          setError(response.data.error || '生成失败')
+        } else if (data.data) {
+          setTasks(prev => prev.map(t => 
+            t.taskId === newTask.taskId 
+              ? { ...t, status: 'completed', progress: 100, resultUrl: data.data }
+              : t
+          ))
+        } else {
+          setTasks(prev => prev.map(t => 
+            t.taskId === newTask.taskId 
+              ? { ...t, status: 'failed', errorMessage: data.error || '生成失败' }
+              : t
+          ))
         }
       } else {
-        if (response.data.success) {
-          setProgress(100)
-          
-          const resultUrls = []
-          if (response.data.result?.result) {
-            if (Array.isArray(response.data.result.result)) {
-              resultUrls.push(...response.data.result.result.map(url => ({ url })))
-            } else {
-              resultUrls.push({ url: response.data.result.result })
-            }
-          }
-          
-          if (response.data.data?.images && Array.isArray(response.data.data.images)) {
-            resultUrls.push(...response.data.data.images.map(url => ({ url })))
-          }
-          
-          if (resultUrls.length === 0 && response.data.data?.url) {
-            resultUrls.push({ url: response.data.data.url })
-          }
-          
-          if (resultUrls.length > 0) {
-            setResults(resultUrls)
-          } else {
-            setError('生成成功，但未返回结果')
-          }
-        } else {
-          setError(response.data.error || '生成失败')
-        }
+        setTasks(prev => prev.map(t => 
+          t.taskId === newTask.taskId 
+            ? { ...t, status: 'failed', errorMessage: data.error || '提交失败' }
+            : t
+        ))
       }
     } catch (err) {
-      setError(err.response?.data?.error || err.message)
-      setGenerating(false)
+      setTasks(prev => prev.map(t => 
+        t.taskId === newTask.taskId 
+          ? { ...t, status: 'failed', errorMessage: err.response?.data?.error || err.message }
+          : t
+      ))
     } finally {
-      clearInterval(progressInterval)
-      clearInterval(timeInterval)
-      if (!isAsyncTask) {
-        setGenerating(false)
-      }
-      setEstimatedTime(null)
+      setIsSubmitting(false)
     }
-  }, [isAuthenticated, prompt, selectedTool, selectedModel, params, referenceImages])
+  }, [isAuthenticated, selectedModel, params, userApiKey, prompt, referenceImages, isSubmitting])
   
   const handleDownload = async (url) => {
     const link = document.createElement('a')
@@ -372,10 +281,11 @@ const [tools, setTools] = useState([])
       height: '100vh', 
       background: 'var(--ai-bg-primary)',
       color: 'var(--ai-text-primary)',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      position: 'relative'
     }}>
       {/* Top Navigation Bar */}
-      <TopNavigationBar title="Weiyuan AI" />
+      <TopNavigationBar title="Weiyuan AI" balance={balance} />
       
       {/* Main Content */}
       <div style={{ 
@@ -413,7 +323,7 @@ const [tools, setTools] = useState([])
             modelType={modelType}
             params={params}
             onChange={setParams}
-            customParams={!selectedModel?.isBuiltIn ? selectedModel?.defaultParams : null}
+            paramConfig={selectedModel?.paramConfig || []}
           />
           
           <div style={{ marginTop: '1rem' }}>
@@ -507,8 +417,12 @@ const [tools, setTools] = useState([])
             onRegenerate={handleGenerate}
             isLoggedIn={isAuthenticated}
             onLogin={handleLogin}
-            token={token}
             userApiKey={userApiKey}
+            token={token}
+            externalTasks={tasks}
+            onAddReference={handleAddReference}
+            onAddReferenceUrl={handleAddReferenceUrl}
+            onUsePrompt={handleUsePrompt}
           />
         </div>
       </div>

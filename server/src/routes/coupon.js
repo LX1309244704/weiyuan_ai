@@ -2,6 +2,32 @@ const express = require('express');
 const router = express.Router();
 const { User, Coupon, BalanceLog } = require('../models');
 const { redis, KEYS, TTL } = require('../config/redis');
+const jwt = require('jsonwebtoken');
+
+/**
+ * 验证用户身份（支持 JWT token 和 apiKey）
+ */
+async function authenticateUser(req) {
+  // 优先使用 JWT token
+  let token = req.headers['authorization'];
+  if (token) {
+    if (token.startsWith('Bearer ')) {
+      token = token.substring(7);
+    }
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      return await User.findByPk(decoded.userId);
+    } catch (e) {}
+  }
+  
+  // 备用 apiKey
+  let apiKey = req.headers['x-api-key'];
+  if (apiKey) {
+    return await User.findOne({ where: { apiKey } });
+  }
+  
+  return null;
+}
 
 router.post('/redeem', async (req, res) => {
   const { code } = req.body;
@@ -91,7 +117,7 @@ router.post('/redeem', async (req, res) => {
       reason: `兑换码兑换 (${coupon.code})`,
       balanceAfter: newBalance,
       relatedId: coupon.id,
-      type: 'purchase'
+      type: 'recharge'
     });
     
     res.json({
@@ -113,13 +139,8 @@ router.post('/redeem', async (req, res) => {
 router.post('/create', async (req, res) => {
   const { amount, type, maxUses, expiresAt, count } = req.body;
   
-  let apiKey = req.headers['x-api-key'] || req.headers['authorization'];
-  if (apiKey && apiKey.startsWith('Bearer ')) {
-    apiKey = apiKey.substring(7);
-  }
-  
-  const adminUser = await User.findOne({ where: { apiKey } });
-  if (!adminUser || adminUser.role !== 'admin') {
+  const user = await authenticateUser(req);
+  if (!user || user.role !== 'admin') {
     return res.status(403).json({
       success: false,
       error: '仅管理员可创建兑换码'
@@ -154,7 +175,7 @@ router.post('/create', async (req, res) => {
         maxUses: maxUses || 1,
         expiresAt: expiresAt || null,
         isActive: true,
-        createdBy: adminUser.id
+        createdBy: user.id
       });
       coupons.push(coupon);
     }
@@ -180,13 +201,8 @@ router.post('/create', async (req, res) => {
 });
 
 router.get('/list', async (req, res) => {
-  let apiKey = req.headers['x-api-key'] || req.headers['authorization'];
-  if (apiKey && apiKey.startsWith('Bearer ')) {
-    apiKey = apiKey.substring(7);
-  }
-  
-  const adminUser = await User.findOne({ where: { apiKey } });
-  if (!adminUser || adminUser.role !== 'admin') {
+  const user = await authenticateUser(req);
+  if (!user || user.role !== 'admin') {
     return res.status(403).json({
       success: false,
       error: '仅管理员可查看兑换码'
@@ -194,13 +210,25 @@ router.get('/list', async (req, res) => {
   }
   
   try {
-    const coupons = await Coupon.findAll({
-      order: [['created_at', 'DESC']]
+    const { page = 1, pageSize = 20 } = req.query;
+    const limit = parseInt(pageSize) || 20;
+    const offset = (parseInt(page) - 1) * limit;
+    
+    const { count, rows } = await Coupon.findAndCountAll({
+      order: [['created_at', 'DESC']],
+      limit,
+      offset
     });
     
     res.json({
       success: true,
-      coupons
+      coupons: rows,
+      pagination: {
+        total: count,
+        page: parseInt(page),
+        pageSize: limit,
+        pages: Math.ceil(count / limit)
+      }
     });
   } catch (error) {
     res.status(500).json({

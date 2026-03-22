@@ -21,10 +21,9 @@ router.post('/create-admin', async (req, res) => {
     const [user, created] = await User.upsert({
       email,
       password: hashedPassword,
-      name: 'Administrator',
+      username: 'Administrator',
       role: 'admin',
       balance: 0,
-      totalPurchased: 0,
       apiKey
     });
     
@@ -45,7 +44,7 @@ router.post('/create-admin', async (req, res) => {
 // Register
 router.post('/register', async (req, res, next) => {
   try {
-    const { email, password, name } = req.body;
+    const { email, password, username } = req.body;
     
     // Check if user exists
     const existingUser = await User.findOne({ where: { email } });
@@ -62,11 +61,10 @@ router.post('/register', async (req, res, next) => {
     // Create user
     const user = await User.create({
       email,
-      name: name || email.split('@')[0],
+      username: username || email.split('@')[0],
       apiKey,
       password: hashedPassword,
-      balance: 0,
-      totalPurchased: 0
+      balance: 0
     });
     
     // Generate JWT
@@ -86,7 +84,7 @@ router.post('/register', async (req, res, next) => {
       user: {
         id: user.id,
         email: user.email,
-        name: user.name,
+        username: user.username,
         apiKey: user.apiKey,
         balance: user.balance,
         role: user.role
@@ -129,7 +127,7 @@ router.post('/login', async (req, res, next) => {
       user: {
         id: user.id,
         email: user.email,
-        name: user.name,
+        username: user.username,
         apiKey: user.apiKey,
         balance: user.balance,
         role: user.role
@@ -150,7 +148,7 @@ router.get('/me', async (req, res, next) => {
     
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const user = await User.findByPk(decoded.userId, {
-      attributes: ['id', 'email', 'name', 'apiKey', 'balance', 'totalPurchased', 'role', 'created_at']
+      attributes: ['id', 'email', 'username', 'apiKey', 'balance', 'role', 'created_at']
     });
     
     if (!user) {

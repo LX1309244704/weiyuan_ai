@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router({ mergeParams: true });
 const { v4: uuidv4 } = require('uuid');
 const axios = require('axios');
-const { User, ApiEndpoint, ApiInvocation, Skill, Invocation } = require('../models');
+const { User, ApiEndpoint, ApiInvocation, Invocation, BalanceLog, sequelize } = require('../models');
 const { redis, KEYS, TTL } = require('../config/redis');
 const { decrypt } = require('../utils/encryption');
 
@@ -167,62 +167,94 @@ function buildTargetHeaders(endpoint, userHeaders) {
 }
 
 function transformRequestBody(requestExample, clientBody) {
-  console.log('[PROXY] transformRequestBody - requestExample:', requestExample);
-  console.log('[PROXY] transformRequestBody - clientBody:', clientBody);
-  
   if (!requestExample) {
     return clientBody;
   }
 
   try {
-    const example = typeof requestExample === 'string' 
-      ? JSON.parse(requestExample) 
-      : requestExample;
+    let example;
+    if (typeof requestExample === 'string') {
+      example = JSON.parse(requestExample);
+    } else {
+      example = requestExample;
+    }
 
     const prompt = clientBody.prompt || '';
     const params = { ...clientBody };
     delete params.prompt;
+    
+    console.log('[PROXY] Transform - prompt:', prompt);
+    console.log('[PROXY] Transform - params:', params);
 
-    let transformed = typeof example === 'string' ? example : JSON.stringify(example);
-
-    transformed = transformed.replace(/\$\{prompt\}/g, prompt)
-      .replace(/\$\{prompt\.text\}/g, prompt)
-      .replace(/\$\{text\}/g, prompt);
+    const result = { ...example };
+    
+    for (const [key, value] of Object.entries(result)) {
+      const strValue = String(value);
+      if (strValue.includes('${prompt}')) {
+        result[key] = strValue.replace(/\$\{prompt\}/g, prompt);
+      } else if (strValue === '${prompt}') {
+        result[key] = prompt;
+      }
+    }
     
     for (const [key, value] of Object.entries(params)) {
-      const placeholder = `\${${key}}`;
-      if (transformed.includes(placeholder)) {
-        transformed = transformed.replace(placeholder, String(value));
-      }
-      if (typeof value === 'string' && transformed.includes(`\${${key}.text}`)) {
-        transformed = transformed.replace(`\${${key}.text}`, value);
-      }
-    }
-
-    if (transformed.includes('${') && transformed.includes('}')) {
-      const dynamicKeys = transformed.match(/\$\{([^}]+)\}/g) || [];
-      for (const key of dynamicKeys) {
-        const field = key.slice(2, -1);
-        if (clientBody[field] !== undefined) {
-          transformed = transformed.replace(key, JSON.stringify(clientBody[field]));
-        } else if (field.includes('.')) {
-          const parts = field.split('.');
-          let val = clientBody;
-          for (const part of parts) {
-            val = val?.[part];
-          }
-          if (val !== undefined) {
-            transformed = transformed.replace(key, JSON.stringify(val));
-          }
+      if (result[key] !== undefined) {
+        if (typeof result[key] === 'object' && result[key] !== null) {
+          result[key] = { ...result[key], ...(typeof value === 'object' ? value : { value }) };
+        } else {
+          result[key] = typeof value === 'object' ? value : String(value);
         }
+      } else {
+        result[key] = value;
       }
     }
 
-    return JSON.parse(transformed);
+    console.log('[PROXY] Transformed body:', JSON.stringify(result, null, 2));
+    return result;
   } catch (e) {
     console.error('[PROXY] Failed to transform request body:', e.message);
     return clientBody;
   }
+}
+
+async function waitForTaskCompletion(endpoint, taskId, maxWaitTime = 120000, pollInterval = 3000) {
+  const startTime = Date.now();
+  const authValue = endpoint.authValue ? decrypt(endpoint.authValue) : null;
+  const authHeader = endpoint.authType === 'bearer' ? `Bearer ${authValue}` : authValue;
+  
+  while (Date.now() - startTime < maxWaitTime) {
+    await new Promise(resolve => setTimeout(resolve, pollInterval));
+    
+    try {
+      const statusResponse = await axios.post(
+        'https://www.runninghub.cn/task/openapi/status',
+        { apiKey: authValue, taskId },
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': authHeader,
+            'Host': 'www.runninghub.cn'
+          },
+          timeout: 10000
+        }
+      );
+      
+      const statusData = statusResponse.data;
+      console.log('[PROXY] Task status:', statusData);
+      
+      if (statusData.data === 'SUCCESS') {
+        return { completed: true, success: true };
+      } else if (statusData.data === 'FAILED') {
+        return { completed: true, success: false, error: 'Task failed' };
+      } else if (statusData.data === 'QUEUED' || statusData.data === 'RUNNING') {
+        console.log('[PROXY] Task still', statusData.data, '- waiting...');
+      }
+    } catch (err) {
+      console.error('[PROXY] Error checking task status:', err.message);
+    }
+  }
+  
+  return { completed: false, error: 'Timeout waiting for task' };
 }
 
 router.use(async (req, res, next) => {
@@ -266,6 +298,8 @@ router.use(async (req, res, next) => {
     }
 
     const fullPath = pathParts.join('/');
+    console.log('[PROXY] Looking for endpoint with pathPrefix:', fullPath);
+    
     endpoint = await ApiEndpoint.findOne({
       where: {
         pathPrefix: fullPath,
@@ -274,9 +308,16 @@ router.use(async (req, res, next) => {
     });
 
     if (!endpoint) {
+      // 尝试查询所有端点用于调试
+      const allEndpoints = await ApiEndpoint.findAll({ 
+        attributes: ['id', 'name', 'pathPrefix', 'isActive'],
+        limit: 10 
+      });
+      console.log('[PROXY] Available endpoints:', allEndpoints.map(e => ({ pathPrefix: e.pathPrefix, isActive: e.isActive })));
+      
       return res.status(404).json({ 
         success: false,
-        error: 'API endpoint not found or inactive',
+        error: `API endpoint not found: ${fullPath}`,
         code: 'ENDPOINT_NOT_FOUND'
       });
     }
@@ -471,21 +512,75 @@ router.use(async (req, res, next) => {
     };
 
     if (isUpstreamError) {
-      await redis.incrby(balanceKey, cost);
-      console.log(`[PROXY] Upstream API error, refunded ${cost} points, response: ${response.status}`);
-    }
-
-    setImmediate(async () => {
-      try {
-        await ApiInvocation.create(invocationRecord);
-        await User.decrement('balance', { by: cost, where: { id: user.id } });
-        await endpoint.increment('usageCount');
+      // 上游API错误，需要退款
+      const refundBalance = await redis.incrby(balanceKey, cost);
+      
+      // 使用事务记录退款
+      await sequelize.transaction(async (t) => {
+        // 更新用户余额
+        await User.update(
+          { balance: refundBalance },
+          { where: { id: user.id }, transaction: t }
+        );
         
-        console.log(`[PROXY] Invocation saved: ${invocationId}, cost=${cost} points, user=${user.id}`);
-      } catch (err) {
-        console.error('[PROXY] Failed to save invocation:', err.message);
-      }
-    });
+        // 创建调用记录
+        await ApiInvocation.create({
+          ...invocationRecord,
+          cost: 0  // 上游错误不扣费
+        }, { transaction: t });
+        
+        // 创建余额变动记录
+        await BalanceLog.create({
+          userId: user.id,
+          change: cost,
+          reason: `API调用失败退款 (${endpoint.name})`,
+          balanceAfter: refundBalance,
+          type: 'refund',
+          relatedId: invocationId
+        }, { transaction: t });
+      });
+      
+      console.log(`[PROXY] Upstream API error, refunded ${cost} points, response: ${response.status}`);
+    } else {
+      // 正常扣费，使用事务保证一致性
+      await sequelize.transaction(async (t) => {
+        // 获取当前用户余额（锁定行）
+        const currentUser = await User.findByPk(user.id, { 
+          attributes: ['balance'],
+          transaction: t,
+          lock: t.LOCK.UPDATE
+        });
+        
+        const newDbBalance = currentUser.balance - cost;
+        
+        // 更新用户余额
+        await User.update(
+          { balance: newDbBalance },
+          { where: { id: user.id }, transaction: t }
+        );
+        
+        // 创建调用记录
+        await ApiInvocation.create(invocationRecord, { transaction: t });
+        
+        // 创建余额变动记录
+        await BalanceLog.create({
+          userId: user.id,
+          change: -cost,
+          reason: `API调用扣费 (${endpoint.name})`,
+          balanceAfter: newDbBalance,
+          type: 'consume',
+          relatedId: invocationId
+        }, { transaction: t });
+        
+        // 增加端点使用次数
+        await endpoint.increment('usageCount', { transaction: t });
+        
+        // 更新 Redis 缓存
+        await redis.set(balanceKey, newDbBalance, 'EX', TTL.INVOCATION_CHECK);
+      });
+      
+      console.log(`[PROXY] Invocation saved: ${invocationId}, cost=${cost} points, user=${user.id}`);
+    }
 
     const result = {
       success: response.status < 400,
@@ -494,6 +589,25 @@ router.use(async (req, res, next) => {
       balance: newBalance,
       data: response.data
     };
+
+    if (response.status < 400 && response.data.taskId) {
+      console.log('[PROXY] Task submitted, waiting for completion:', response.data.taskId);
+      
+      const taskResult = await waitForTaskCompletion(endpoint, response.data.taskId);
+      
+      if (taskResult.completed) {
+        if (taskResult.success) {
+          console.log('[PROXY] Task completed successfully');
+          result.data = { ...result.data, status: 'SUCCESS', completed: true };
+        } else {
+          console.log('[PROXY] Task failed:', taskResult.error);
+          result.data = { ...result.data, status: 'FAILED', error: taskResult.error, completed: true };
+        }
+      } else {
+        console.log('[PROXY] Task polling timeout, returning taskId for client to poll');
+        result.data = { ...result.data, status: 'RUNNING', taskId: response.data.taskId };
+      }
+    }
 
     await redis.set(idempotencyKey, JSON.stringify(result), 'EX', TTL.INVOCATION_CHECK);
 

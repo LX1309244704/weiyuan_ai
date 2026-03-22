@@ -22,7 +22,6 @@ import '../../styles/generate.css'
 
 const menuItems = [
   { key: 'dashboard', label: '仪表盘', icon: LayoutDashboard },
-  { key: 'skills', label: 'Skill管理', icon: Wrench },
   { key: 'endpoints', label: 'API端点', icon: Code },
   { key: 'orders', label: '订单管理', icon: ShoppingCart },
   { key: 'users', label: '用户管理', icon: Users },
@@ -33,7 +32,7 @@ const menuItems = [
 const mainMenuItems = [
   { label: 'AI创作', path: '/generate', icon: Sparkles },
   { label: '生成记录', path: '/generate/history', icon: FileText },
-  { label: '技能', path: '/', icon: Package },
+  { label: '首页', path: '/', icon: Package },
   { label: 'API', path: '/api-market', icon: Plug },
   { label: '个人中心', path: '/profile', icon: UserCircle2 }
 ]

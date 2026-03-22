@@ -184,7 +184,7 @@ export default function SettingsTab() {
         <div className="space-y-3 text-sm">
           <div className="flex justify-between">
             <span className="text-gray-600">系统名称</span>
-            <span className="text-gray-900">OpenClaw Skill 市场</span>
+            <span className="text-gray-900">Weiyuan AI</span>
           </div>
           <div className="flex justify-between">
             <span className="text-gray-600">版本</span>

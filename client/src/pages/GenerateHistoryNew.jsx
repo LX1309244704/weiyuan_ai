@@ -5,7 +5,7 @@ import api from '../utils/api'
 import { 
   Image, Video, Clock, Download, 
   Calendar, Zap, ArrowLeft, Trash2, Sparkles, 
-  CheckCircle, XCircle, Loader2
+  CheckCircle, XCircle, Loader2, X
 } from 'lucide-react'
 import dayjs from 'dayjs'
 import TopNavigationBar from '../components/TopNavigationBar'
@@ -21,6 +21,7 @@ function GenerateHistory() {
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [userApiKey, setUserApiKey] = useState('')
+  const [previewItem, setPreviewItem] = useState(null)
   
   useEffect(() => {
     if (!isAuthenticated) {
@@ -82,6 +83,22 @@ function GenerateHistory() {
     document.body.removeChild(link)
   }
   
+  const isVideo = (item) => {
+    if (!item) return false
+    const url = item.resultUrl || ''
+    const model = (item.modelName || '').toLowerCase()
+    return url.includes('.mp4') || url.includes('.webm') || model.includes('veo') || model.includes('video') || model.includes('grok')
+  }
+  
+  const getModelDisplayName = (modelId) => {
+    const modelNames = {
+      'runninghub/nanobanana': '香蕉Pro',
+      'runninghub/veo31': 'VEO3.1视频生成',
+      'huoshan/image': '火山图片'
+    }
+    return modelNames[modelId] || modelId?.split('/')?.pop() || modelId || '未知模型'
+  }
+  
   const getStatusBadge = (status) => {
     switch (status) {
       case 'completed':
@@ -117,7 +134,7 @@ function GenerateHistory() {
   
   const filteredHistory = history.filter(item => {
     if (filter === 'all') return true
-    return item.type === filter || (item.model?.toLowerCase().includes('video') ? 'video' : 'image') === filter
+    return item.type === filter || (item.modelName?.toLowerCase().includes('video') ? 'video' : 'image') === filter
   })
   
   return (
@@ -137,56 +154,6 @@ function GenerateHistory() {
         display: 'flex',
         flexDirection: 'column'
       }}>
-        <div style={{
-          padding: '2rem',
-          borderBottom: '1px solid var(--ai-border-color)',
-        }}>
-          <div style={{ 
-            display: 'flex', 
-            alignItems: 'center', 
-            gap: '1rem' 
-          }}>
-            <button
-              onClick={() => navigate('/generate')}
-              style={{
-                background: 'none',
-                border: 'none',
-                color: 'var(--ai-text-secondary)',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                fontSize: '0.875rem',
-                padding: '0.5rem',
-                borderRadius: '6px',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.color = 'var(--ai-text-primary)'
-                e.target.style.backgroundColor = 'var(--ai-bg-hover)'
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.color = 'var(--ai-text-secondary)'
-                e.target.style.backgroundColor = 'transparent'
-              }}
-            >
-              <ArrowLeft size={16} />
-              返回创作
-            </button>
-            <h1 style={{
-              fontSize: '1.5rem',
-              fontWeight: 600,
-              color: 'var(--ai-text-primary)',
-              background: 'linear-gradient(135deg, var(--ai-accent-green) 0%, var(--ai-accent-blue) 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-              backgroundClip: 'text'
-            }}>
-              生成历史
-            </h1>
-          </div>
-        </div>
-        
         <div style={{ 
           padding: '1.5rem 2rem',
           borderBottom: '1px solid var(--ai-border-color)',
@@ -303,7 +270,7 @@ function GenerateHistory() {
             }}>
               {filteredHistory.map((item) => {
                 const statusBadge = getStatusBadge(item.status)
-                const isVideo = item.model?.toLowerCase().includes('video') || item.model?.toLowerCase().includes('veo') || item.model?.toLowerCase().includes('grok')
+                const itemIsVideo = isVideo(item)
                 
                 return (
                   <div 
@@ -328,7 +295,7 @@ function GenerateHistory() {
                     }}
                   >
                     <div style={{
-                      aspectRatio: '16/9',
+                      aspectRatio: '9/16',
                       background: 'var(--ai-bg-secondary)',
                       display: 'flex',
                       alignItems: 'center',
@@ -337,17 +304,19 @@ function GenerateHistory() {
                       overflow: 'hidden'
                     }}>
                       {item.status === 'completed' && item.resultUrl ? (
-                        isVideo ? (
+                        itemIsVideo ? (
                           <video 
                             src={item.resultUrl} 
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }}
                             controls
+                            onClick={() => setPreviewItem(item)}
                           />
                         ) : (
                           <img 
                             src={item.resultUrl} 
                             alt="Generated"
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                            style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'pointer' }}
+                            onClick={() => setPreviewItem(item)}
                           />
                         )
                       ) : item.status === 'failed' ? (
@@ -390,14 +359,14 @@ function GenerateHistory() {
                         top: '0.5rem',
                         left: '0.5rem',
                         padding: '0.25rem 0.5rem',
-                        background: isVideo ? 'var(--ai-accent-purple)' : 'var(--ai-accent-blue)',
+                        background: itemIsVideo ? 'var(--ai-accent-purple)' : 'var(--ai-accent-blue)',
                         color: 'white',
                         borderRadius: '4px',
                         fontSize: '0.625rem',
                         fontWeight: 600,
                         textTransform: 'uppercase'
                       }}>
-                        {isVideo ? '视频' : '图片'}
+                        {itemIsVideo ? '视频' : '图片'}
                       </div>
                       
                       <div style={{
@@ -477,7 +446,7 @@ function GenerateHistory() {
                           <Calendar size={10} />
                           {dayjs(item.createdAt).format('MM-DD HH:mm')}
                         </div>
-                        <span style={{ fontWeight: 500 }}>{item.model}</span>
+                        <span style={{ fontWeight: 500 }}>{getModelDisplayName(item.modelName)}</span>
                       </div>
                     </div>
                   </div>
@@ -487,6 +456,83 @@ function GenerateHistory() {
           )}
         </div>
       </div>
+
+      {previewItem && (
+        <div 
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0, 0, 0, 0.9)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000
+          }}
+          onClick={() => setPreviewItem(null)}
+        >
+          <button
+            onClick={() => setPreviewItem(null)}
+            style={{
+              position: 'absolute',
+              top: '1rem',
+              right: '1rem',
+              background: 'rgba(255, 255, 255, 0.1)',
+              border: 'none',
+              borderRadius: '50%',
+              width: '44px',
+              height: '44px',
+              cursor: 'pointer',
+              color: 'white'
+            }}
+          >
+            <X size={24} />
+          </button>
+          
+          <div 
+            style={{
+              maxWidth: '90vw',
+              maxHeight: '85vh',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {(() => {
+              const url = previewItem?.resultUrl || ''
+              const model = (previewItem?.modelName || '').toLowerCase()
+              const isMp4 = url.includes('.mp4') || url.includes('.webm')
+              const isVeo = model.includes('veo') || model.includes('video')
+              return isMp4 || isVeo ? (
+                <video 
+                  src={previewItem.resultUrl} 
+                  controls
+                  autoPlay
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '85vh',
+                    borderRadius: '8px'
+                  }}
+                />
+              ) : (
+                <img 
+                  src={previewItem.resultUrl} 
+                  alt="Preview"
+                  style={{
+                    maxWidth: '100%',
+                    maxHeight: '85vh',
+                    objectFit: 'contain',
+                    borderRadius: '8px'
+                  }}
+                />
+              )
+            })()}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

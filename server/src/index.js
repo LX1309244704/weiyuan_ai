@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../.env') });
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -12,56 +12,23 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Security middleware
-app.use(helmet({
-  contentSecurityPolicy: false
-}));
-app.use(cors({
-  origin: true,
-  credentials: true
-}));
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(cors({ origin: true, credentials: true }));
 
-// Serve static files (uploaded skill packages)
-app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
-  setHeaders: (res) => {
-    res.setHeader('Content-Disposition', 'attachment');
-  }
-}));
-
-// Serve static files (uploaded skill packages)
-app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
-  setHeaders: (res) => {
-    res.setHeader('Content-Disposition', 'attachment');
-  }
-}));
-
-// Rate limiting - high concurrency config
+// Rate limiting
 const generalLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 1000, // 1000 requests per minute for general routes
-  message: { error: 'Too many requests, please try again later.' },
-  standardHeaders: true,
-  legacyHeaders: false
-});
-
-const billingLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 5000, // 5000 QPS for billing API
-  message: { error: 'Billing service busy, please try again.' },
-  standardHeaders: true,
-  legacyHeaders: false
+  max: 3000,
+  message: { error: 'Too many requests' }
 });
 
 const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // 20 attempts per 15 minutes for auth
-  message: { error: 'Too many login attempts, please try again later.' },
-  standardHeaders: true,
-  legacyHeaders: false
+  windowMs: 15 * 60 * 1000,
+  max: 100,
+  message: { error: 'Too many login attempts' }
 });
 
-// Apply rate limiters
 app.use('/api/', generalLimiter);
-app.use('/api/billing', billingLimiter);
 app.use('/api/auth', authLimiter);
 
 // Body parsing
@@ -76,49 +43,39 @@ app.get('/health', (req, res) => {
 // API Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/users', require('./routes/users'));
-app.use('/api/skills', require('./routes/skills'));
 app.use('/api/orders', require('./routes/orders'));
 app.use('/api/billing', require('./routes/billing'));
 app.use('/api/payment', require('./routes/payment'));
 app.use('/api/proxy', require('./routes/proxy'));
 app.use('/api/generate', require('./routes/generate'));
-app.use('/api/ai-generate', require('./routes/aiGenerate'));
+const aiGenerateRouter = require('./routes/aiGenerate');
+app.use('/api/ai-generate', aiGenerateRouter);
 app.use('/api/coupon', require('./routes/coupon'));
-
 app.use('/api/admin', require('./routes/admin'));
+
+// 启动 BullMQ Worker
+const { createPollingWorker, recoverPendingTasks } = require('./config/queue');
+let pollingWorker = null;
 
 // Serve frontend static files
 app.use(express.static(path.join(__dirname, '../public')));
 
-// SPA fallback - serve index.html for all non-API routes
+// SPA fallback
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api/')) {
-    return next();
-  }
+  if (req.path.startsWith('/api/')) return next();
   res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
-// Error handling middleware
+// Error handling
 app.use((err, req, res, next) => {
   console.error('Error:', err);
-  
   if (err.name === 'SequelizeValidationError') {
-    return res.status(400).json({
-      error: 'Validation error',
-      details: err.errors.map(e => e.message)
-    });
+    return res.status(400).json({ error: 'Validation error', details: err.errors.map(e => e.message) });
   }
-  
   if (err.name === 'SequelizeUniqueConstraintError') {
-    return res.status(409).json({
-      error: 'Duplicate entry',
-      details: err.errors.map(e => e.message)
-    });
+    return res.status(409).json({ error: 'Duplicate entry' });
   }
-  
-  res.status(err.statusCode || 500).json({
-    error: err.message || 'Internal server error'
-  });
+  res.status(err.statusCode || 500).json({ error: err.message || 'Internal server error' });
 });
 
 // 404 handler
@@ -126,71 +83,97 @@ app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
-// Run database migrations
-async function runMigrations() {
+// Initialize user balances in Redis
+async function initializeBalanceCache() {
   try {
-    const migrations = [
-      { table: 'ai_generate_tasks', column: 'endpoint_id', sql: "ALTER TABLE ai_generate_tasks ADD COLUMN endpoint_id VARCHAR(36)" },
-      { table: 'ai_generate_tasks', column: 'api_key', sql: "ALTER TABLE ai_generate_tasks ADD COLUMN api_key VARCHAR(64)" },
-      { table: 'ai_generate_tasks', column: 'model', sql: "ALTER TABLE ai_generate_tasks ADD COLUMN model VARCHAR(100)" },
-      { table: 'ai_generate_tasks', column: 'refund_amount', sql: "ALTER TABLE ai_generate_tasks ADD COLUMN refund_amount INT DEFAULT 0" },
-      { table: 'ai_generate_tasks', column: 'balance_change_type', sql: "ALTER TABLE ai_generate_tasks ADD COLUMN balance_change_type ENUM('consume', 'refund') DEFAULT 'consume'" },
-      { table: 'ai_generate_tasks', column: 'balance_change_at', sql: "ALTER TABLE ai_generate_tasks ADD COLUMN balance_change_at DATETIME" },
-      { table: 'api_endpoints', column: 'headers_mapping', sql: "ALTER TABLE api_endpoints ADD COLUMN headers_mapping JSON" },
-      { table: 'api_endpoints', column: 'request_example', sql: "ALTER TABLE api_endpoints ADD COLUMN request_example TEXT" },
-      { table: 'api_endpoints', column: 'response_example', sql: "ALTER TABLE api_endpoints ADD COLUMN response_example TEXT" },
-      { table: 'api_endpoints', column: 'is_generate_tool', sql: "ALTER TABLE api_endpoints ADD COLUMN is_generate_tool BOOLEAN DEFAULT FALSE" },
-      { table: 'api_endpoints', column: 'show_in_generate', sql: "ALTER TABLE api_endpoints ADD COLUMN show_in_generate BOOLEAN DEFAULT FALSE" },
-      { table: 'api_endpoints', column: 'default_params', sql: "ALTER TABLE api_endpoints ADD COLUMN default_params JSON" },
-      { table: 'api_endpoints', column: 'output_fields', sql: "ALTER TABLE api_endpoints ADD COLUMN output_fields JSON" },
-    ];
-
-    for (const migration of migrations) {
-      try {
-        await sequelize.query(migration.sql);
-        console.log(`Migration: Added ${migration.column} to ${migration.table}`);
-      } catch (err) {
-        if (err.original && err.original.code === 'ER_DUP_FIELDNAME') {
-          // Column already exists, that's fine
-        } else if (!err.message.includes('Duplicate column name')) {
-          console.log(`Migration skip ${migration.column}: ${err.message}`);
-        }
-      }
+    const { User } = require('./models');
+    const users = await User.findAll({ attributes: ['id', 'balance'] });
+    const pipeline = redis.pipeline();
+    for (const user of users) {
+      pipeline.set(`balance:${user.id}`, user.balance, 'EX', 86400);
     }
-    console.log('Database migrations completed.');
+    await pipeline.exec();
+    console.log(`Cached ${users.length} user balances`);
   } catch (error) {
-    console.error('Migration error:', error.message);
+    console.error('Failed to initialize balance cache:', error.message);
   }
 }
 
-// Initialize database and start server
+// Create default accounts
+async function createDefaultAccounts() {
+  try {
+    const { User } = require('./models');
+    const bcrypt = require('bcryptjs');
+    const { v4: uuidv4 } = require('uuid');
+
+    // Admin account
+    const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
+    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
+    let admin = await User.findOne({ where: { email: adminEmail } });
+
+    if (!admin) {
+      const hashedPassword = await bcrypt.hash(adminPassword, 10);
+      admin = await User.create({
+        email: adminEmail,
+        password: hashedPassword,
+        username: 'Administrator',
+        role: 'admin',
+        balance: 10000,
+        apiKey: uuidv4().replace(/-/g, '')
+      });
+      console.log(`Admin created: ${adminEmail}`);
+    }
+
+    // Test account
+    const testEmail = 'test@example.com';
+    let testUser = await User.findOne({ where: { email: testEmail } });
+
+    if (!testUser) {
+      const hashedPassword = await bcrypt.hash('test123', 10);
+      testUser = await User.create({
+        email: testEmail,
+        password: hashedPassword,
+        username: 'TestUser',
+        role: 'user',
+        balance: 5000,
+        apiKey: uuidv4().replace(/-/g, '')
+      });
+      console.log(`Test user created: ${testEmail}`);
+    }
+  } catch (error) {
+    console.error('Failed to create accounts:', error.message);
+  }
+}
+
+// Start server
 async function startServer() {
   try {
-    // Test database connection
     await sequelize.authenticate();
-    console.log('Database connection established successfully.');
-    
-    // Run migrations for ai_generate_tasks table
-    await runMigrations();
-    
-    // Sync models (use { force: true } to reset tables)
-    // Use alter: false to avoid index duplication issues
-    await sequelize.sync({ alter: false });
-    console.log('Database models synchronized.');
-    
-    // Create default admin account if not exists
-    await createDefaultAdmin();
-    
-    // Test Redis connection
+    console.log('Database connected.');
+
+    // 使用 { force: false } 避免自动创建表，依赖 init.sql 创建表结构
+    // 如果需要更新表结构，请手动执行 init.sql
+    await sequelize.sync({ force: false, alter: false });
+    console.log('Models synchronized.');
+
+    await createDefaultAccounts();
+
     await redis.ping();
-    console.log('Redis connection established.');
-    
-    // Initialize Redis balance cache from database
+    console.log('Redis connected.');
+
     await initializeBalanceCache();
-    
+
+    // 启动 BullMQ Worker
+    pollingWorker = createPollingWorker();
+    console.log('BullMQ Worker started');
+
+    // 延迟恢复未完成的任务（等待 Worker 启动）
+    setTimeout(async () => {
+      await recoverPendingTasks();
+    }, 3000);
+
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
-      console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);
@@ -198,76 +181,22 @@ async function startServer() {
   }
 }
 
-// Initialize user balances in Redis from database
-async function initializeBalanceCache() {
-  try {
-    const { User } = require('./models');
-    const users = await User.findAll({ attributes: ['id', 'balance'] });
-    
-    const pipeline = redis.pipeline();
-    for (const user of users) {
-      pipeline.set(`balance:${user.id}`, user.balance, 'EX', 86400); // 24h TTL
-    }
-    await pipeline.exec();
-    console.log(`Cached ${users.length} user balances in Redis`);
-  } catch (error) {
-    console.error('Failed to initialize balance cache:', error.message);
-  }
-}
-
-// Create default admin account
-async function createDefaultAdmin() {
-  try {
-    const { User, sequelize } = require('./models');
-    const bcrypt = require('bcryptjs');
-    
-    const adminEmail = process.env.ADMIN_EMAIL || 'admin@example.com';
-    const adminPassword = process.env.ADMIN_PASSWORD || 'admin123';
-    
-    console.log('Creating admin account...');
-    console.log('Admin email:', adminEmail);
-    
-    // Check by email first
-    let admin = await User.findOne({ where: { email: adminEmail } });
-    
-    if (admin) {
-      admin.password = await bcrypt.hash(adminPassword, 10);
-      admin.role = 'admin';
-      await admin.save();
-      console.log(`Admin account updated: ${adminEmail}, role: ${admin.role}`);
-    } else {
-      // Use upsert to create or update
-      const hashedPassword = await bcrypt.hash(adminPassword, 10);
-      admin = await User.upsert({
-        email: adminEmail,
-        password: hashedPassword,
-        name: 'Administrator',
-        role: 'admin',
-        balance: 0,
-        apiKey: require('uuid').v4().replace(/-/g, '')
-      });
-      console.log(`Default admin account created: ${adminEmail} (password: ${adminPassword})`);
-    }
-    
-    // Verify
-    const verifyAdmin = await User.findOne({ where: { email: adminEmail } });
-    console.log('Admin account verify:', verifyAdmin ? 'EXISTS' : 'NOT FOUND', 'role:', verifyAdmin?.role);
-    
-  } catch (error) {
-    console.error('Failed to create default admin:', error.message, error.stack);
-  }
-}
-
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-  console.log('SIGTERM received. Shutting down gracefully...');
+  console.log('Shutting down...');
+  if (pollingWorker) {
+    await pollingWorker.close();
+  }
   await sequelize.close();
   await redis.quit();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-  console.log('SIGINT received. Shutting down gracefully...');
+  console.log('Shutting down...');
+  if (pollingWorker) {
+    await pollingWorker.close();
+  }
   await sequelize.close();
   await redis.quit();
   process.exit(0);

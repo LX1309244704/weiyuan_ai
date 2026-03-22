@@ -1,9 +1,9 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../context/AuthContext'
-import { User, Sparkles, Package, Plug, FileText, UserCircle2, LogOut, Settings } from 'lucide-react'
+import { User, Sparkles, Plug, FileText, UserCircle2, LogOut, Settings, Coins, DollarSign } from 'lucide-react'
 import '../styles/generate.css'
 
-export default function TopNavigationBar({ title = "Weiyuan AI" }) {
+export default function TopNavigationBar({ title = "Weiyuan AI", balance = 0 }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, isAuthenticated, logout } = useAuthStore()
@@ -14,9 +14,8 @@ export default function TopNavigationBar({ title = "Weiyuan AI" }) {
   }
   
   const menuItems = [
-    { label: 'AI创作', path: '/generate', icon: Sparkles, highlightPaths: ['/generate'] },
+    { label: 'AI创作', path: '/', icon: Sparkles, highlightPaths: ['/', '/generate'] },
     { label: '生成记录', path: '/generate/history', icon: FileText, highlightPaths: ['/generate/history'] },
-    { label: '技能', path: '/', icon: Package, highlightPaths: ['/'] },
     { label: 'API', path: '/api-market', icon: Plug, highlightPaths: ['/api-market'] },
     { label: '个人中心', path: '/profile', icon: UserCircle2, highlightPaths: ['/profile', '/recharge'] }
   ]
@@ -132,6 +131,18 @@ export default function TopNavigationBar({ title = "Weiyuan AI" }) {
         )}
         {isAuthenticated ? (
           <>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              padding: '0.5rem 0.75rem',
+              background: '#ffffff',
+              border: '1px solid #d97706',
+              borderRadius: '8px'
+            }}>
+              <DollarSign size={16} style={{ color: '#d97706' }} />
+              <span style={{ fontSize: '0.875rem', fontWeight: 600, color: '#92400e' }}>{Number(balance || 0).toLocaleString()}</span>
+            </div>
             <button
               onClick={() => navigate('/profile')}
               style={{

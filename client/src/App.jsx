@@ -1,8 +1,6 @@
-import { Routes, Route } from 'react-router-dom'
-import HomeNew from './pages/HomeNew'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import LoginNew from './pages/LoginNew'
 import RegisterNew from './pages/RegisterNew'
-import SkillDetailNew from './pages/SkillDetailNew'
 import ProfileNew from './pages/ProfileNew'
 import AdminDashboard from './pages/AdminDashboard'
 import Payment from './pages/Payment'
@@ -17,8 +15,7 @@ import Assets from './pages/Assets'
 function App() {
   return (
     <Routes>
-      <Route path="/" element={<HomeNew />} />
-      <Route path="skills/:id" element={<SkillDetailNew />} />
+      <Route path="/" element={<GenerateNew />} />
       <Route path="generate" element={<GenerateNew />} />
       <Route path="generate/history" element={<GenerateHistoryNew />} />
       <Route path="api-market" element={<ApiListNew />} />

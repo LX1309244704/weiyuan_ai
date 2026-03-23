@@ -94,6 +94,7 @@ function GenerateHistory() {
     const modelNames = {
       'runninghub/nanobanana': '香蕉Pro',
       'runninghub/veo31': 'VEO3.1视频生成',
+      'runninghub/sora2': 'Sora2 视频生成',
       'huoshan/image': '火山图片'
     }
     return modelNames[modelId] || modelId?.split('/')?.pop() || modelId || '未知模型'
@@ -339,7 +340,7 @@ function GenerateHistory() {
                           color: '#f59e0b'
                         }}>
                           <Loader2 size={48} className="ai-spin" />
-                          <span style={{ fontSize: '0.875rem' }}>生成中... {item.progress || 0}%</span>
+                          <span style={{ fontSize: '0.875rem' }}>生成中...</span>
                         </div>
                       ) : (
                         <div style={{

@@ -2470,10 +2470,10 @@ function RedemptionCodesTab() {
                       borderRadius: '9999px',
                       fontSize: '0.75rem',
                       fontWeight: 500,
-                      background: code.is_active ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                      color: code.is_active ? '#22c55e' : '#ef4444'
+                      background: code.isActive ? 'rgba(34, 197, 94, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                      color: code.isActive ? '#22c55e' : '#ef4444'
                     }}>
-                      {code.is_active ? '可用' : '已使用'}
+                      {code.isActive ? '可用' : '已使用'}
                     </span>
                   </td>
                   <td style={{ padding: '1rem', color: '#64748b' }}>

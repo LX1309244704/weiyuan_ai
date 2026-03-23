@@ -45,6 +45,38 @@ class RunningHubProvider extends BaseProvider {
         }
       ]
     },
+    // 视频模型 - Sora2 (文生视频/图生视频合一)
+    {
+      id: 'runninghub/sora2',
+      name: 'Sora2 视频生成',
+      description: '全能视频S-文生视频/图生视频，有图用图生，无图用文生',
+      type: 'video',
+      icon: '🎬',
+      pricePerCall: 80,
+      defaultParams: { aspectRatio: '9:16', duration: '10' },
+      paramConfig: [
+        {
+          name: 'aspectRatio',
+          label: '视频比例',
+          type: 'select',
+          options: [
+            { value: '9:16', label: '9:16 (竖屏)' },
+            { value: '16:9', label: '16:9 (横屏)' }
+          ],
+          default: '9:16'
+        },
+        {
+          name: 'duration',
+          label: '视频时长',
+          type: 'select',
+          options: [
+            { value: '10', label: '10秒' },
+            { value: '15', label: '15秒' }
+          ],
+          default: '10'
+        }
+      ]
+    },
     // 视频模型 - VEO3.1视频生成
     {
       id: 'runninghub/veo31',
@@ -106,6 +138,9 @@ class RunningHubProvider extends BaseProvider {
       'runninghub/nanobanana': (hasImage) => hasImage 
         ? 'https://www.runninghub.cn/openapi/v2/rhart-image-n-pro/edit'
         : 'https://www.runninghub.cn/openapi/v2/rhart-image-n-pro/text-to-image',
+      'runninghub/sora2': (hasImage) => hasImage
+        ? 'https://www.runninghub.cn/openapi/v2/rhart-video-s/image-to-video'
+        : 'https://www.runninghub.cn/openapi/v2/rhart-video-s/text-to-video',
       'runninghub/veo31': {
         't2v': 'https://www.runninghub.cn/openapi/v2/rhart-video-v3.1-pro/text-to-video',
         'se2v': 'https://www.runninghub.cn/openapi/v2/rhart-video-v3.1-fast/start-end-to-video',
@@ -147,6 +182,28 @@ class RunningHubProvider extends BaseProvider {
       body.aspectRatio = aspectRatio || '16:9';
       body.duration = duration || '8';
       body.resolution = resolution || '720p';
+    } else if (this.modelId === 'runninghub/sora2') {
+      // Sora2 (文生视频/图生视频合一) - 使用 S 系列 API
+      if (imageUrls && imageUrls.length > 0) {
+        // 有参考图，使用图生视频
+        body.imageUrl = imageUrls[0];
+        body.storyboard = false;
+      }
+      // 文生视频和图生视频使用相同参数
+      body.aspectRatio = aspectRatio || '9:16';
+      body.duration = duration || '10';
+      body.storyboard = false;
+    } else if (this.modelId === 'runninghub/sora2x') {
+      // 全能视频X (文生视频)
+      body.aspectRatio = aspectRatio || '2:3';
+      body.resolution = resolution || '720P';
+      body.duration = duration || '6s';
+    } else if (this.modelId === 'runninghub/sora2s') {
+      // 全能视频S (图生视频)
+      if (imageUrls && imageUrls.length > 0) body.imageUrl = imageUrls[0];
+      body.duration = duration || '10';
+      body.aspectRatio = aspectRatio || '9:16';
+      body.storyboard = false;
     } else {
       // 图片生成
       const resolutionMap = {
@@ -177,6 +234,10 @@ class RunningHubProvider extends BaseProvider {
       return requestBody.imageUrls && requestBody.imageUrls.length > 0
         ? 'https://www.runninghub.cn/openapi/v2/rhart-image-n-pro/edit'
         : 'https://www.runninghub.cn/openapi/v2/rhart-image-n-pro/text-to-image';
+    } else if (modelId === 'runninghub/sora2' || modelId === 'runninghub/sora2x') {
+      return requestBody.imageUrl
+        ? 'https://www.runninghub.cn/openapi/v2/rhart-video-s/image-to-video'
+        : 'https://www.runninghub.cn/openapi/v2/rhart-video-s/text-to-video';
     }
     
     return 'https://www.runninghub.cn/openapi/v2/rhart-image-n-pro/text-to-image';

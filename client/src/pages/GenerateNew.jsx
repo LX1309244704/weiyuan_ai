@@ -26,6 +26,7 @@ export default function GenerateNew() {
   const [generating, setGenerating] = useState(false)
   const [progress, setProgress] = useState(0)
   const [estimatedTime, setEstimatedTime] = useState(null)
+  const [elapsedTime, setElapsedTime] = useState(0)
   const [results, setResults] = useState([])
   const [error, setError] = useState(null)
   const [tasks, setTasks] = useState([])
@@ -46,6 +47,19 @@ export default function GenerateNew() {
       setBalance(user.balance)
     }
   }, [user])
+
+  useEffect(() => {
+    let interval
+    if (generating) {
+      setElapsedTime(0)
+      interval = setInterval(() => {
+        setElapsedTime(t => t + 1)
+      }, 1000)
+    } else {
+      setElapsedTime(0)
+    }
+    return () => clearInterval(interval)
+  }, [generating])
   
   const fetchUserApiKey = async () => {
     try {
@@ -413,6 +427,7 @@ export default function GenerateNew() {
             generating={generating}
             progress={progress}
             estimatedTime={estimatedTime}
+            elapsedTime={elapsedTime}
             modelType={modelType}
             onRegenerate={handleGenerate}
             isLoggedIn={isAuthenticated}

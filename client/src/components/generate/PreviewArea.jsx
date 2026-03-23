@@ -6,6 +6,7 @@ export default function PreviewArea({
   generating, 
   progress = 0, 
   estimatedTime,
+  elapsedTime = 0,
   modelType,
   onRegenerate,
   isLoggedIn,
@@ -296,6 +297,7 @@ export default function PreviewArea({
     const modelNames = {
       'runninghub/nanobanana': '香蕉Pro',
       'runninghub/veo31': 'VEO3.1视频生成',
+      'runninghub/sora2': 'Sora2 视频生成',
       'huoshan/image': '火山图片'
     }
     return modelNames[modelId] || modelId?.split('/')?.pop() || modelId || '未知模型'
@@ -319,7 +321,14 @@ export default function PreviewArea({
               style={{ strokeDasharray: circumference, strokeDashoffset }}
             />
           </svg>
-          <div className="ai-generating-text">正在生成中...</div>
+          <div className="ai-generating-text">
+            正在生成中...
+            {elapsedTime > 0 && (
+              <span style={{ marginLeft: '0.5rem', fontSize: '0.875rem', color: 'var(--ai-text-secondary)' }}>
+                {Math.floor(elapsedTime / 60).toString().padStart(2, '0')}:{(elapsedTime % 60).toString().padStart(2, '0')}
+              </span>
+            )}
+          </div>
           {estimatedTime && <div className="ai-generating-time">预计剩余 {estimatedTime} 秒</div>}
         </div>
       </div>
@@ -384,6 +393,7 @@ export default function PreviewArea({
         )}
 
         {/* 网格布局显示结果 */}
+        {tasks.length > 0 && (
         <div style={{ 
           display: 'grid', 
           gridTemplateColumns: 'repeat(6, 1fr)', 
@@ -448,7 +458,7 @@ export default function PreviewArea({
                     }}>
                       <Loader2 size={24} className="ai-spin" />
                       <span style={{ fontSize: '0.75rem', marginTop: '0.5rem' }}>
-                        {task.status === 'queued' ? '排队中...' : `${task.progress || 0}%`}
+                        {task.status === 'queued' ? '排队中...' : '生成中...'}
                       </span>
                     </div>
                   ) : (
@@ -482,7 +492,7 @@ export default function PreviewArea({
                       {statusDisplay.icon}
                       {statusDisplay.text}
                     </span>
-                    {task.cost && (
+                    {task.cost > 0 && (
                       <span style={{ fontSize: '0.7rem', color: 'var(--ai-text-muted)' }}>
                         -{task.cost}积分
                       </span>
@@ -644,6 +654,7 @@ export default function PreviewArea({
             )
           })}
         </div>
+        )}
 
         {loading && (
           <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--ai-text-secondary)' }}>

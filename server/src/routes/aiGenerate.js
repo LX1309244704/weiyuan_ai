@@ -21,11 +21,15 @@ router.get('/models', async (req, res) => {
   try {
     const providers = await AiModel.findAll({
       where: { isActive: true },
-      attributes: ['provider', 'name']
+      attributes: ['provider', 'name', 'apiKey']
     });
     
     const models = [];
     for (const p of providers) {
+      // 检查是否配置了 API Key
+      if (!p.apiKey || p.apiKey.trim() === '') {
+        continue;
+      }
       const ProviderClass = providerManager.providers.get(p.provider);
       if (ProviderClass && ProviderClass.models) {
         for (const m of ProviderClass.models) {

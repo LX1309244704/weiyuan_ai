@@ -275,14 +275,20 @@ export default function PreviewArea({
     }
   }
 
-  const getStatusDisplay = (status, progress) => {
+  const getStatusDisplay = (status, progress, elapsedTime) => {
+    const formatTime = (seconds) => {
+      const mins = Math.floor(seconds / 60)
+      const secs = seconds % 60
+      return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`
+    }
+    
     switch (status) {
       case 'completed':
         return { icon: <CheckCircle size={12} />, text: '已完成', color: '#22c55e', bg: 'rgba(34, 197, 94, 0.1)' }
       case 'failed':
         return { icon: <XCircle size={12} />, text: '失败', color: '#ef4444', bg: 'rgba(239, 68, 68, 0.1)' }
       case 'processing':
-        return { icon: <Loader2 size={12} className="ai-spin" />, text: `${progress || 0}%`, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' }
+        return { icon: <Loader2 size={12} className="ai-spin" />, text: elapsedTime > 0 ? formatTime(elapsedTime) : `${progress || 0}%`, color: '#f59e0b', bg: 'rgba(245, 158, 11, 0.1)' }
       default:
         return { icon: <Clock size={12} />, text: '排队中', color: '#6b7280', bg: 'rgba(107, 114, 128, 0.1)' }
     }
@@ -290,12 +296,13 @@ export default function PreviewArea({
 
   const isVideo = (model) => {
     const modelLower = (model || '').toLowerCase()
-    return modelLower.includes('video') || modelLower.includes('veo') || modelLower.includes('grok')
+    return modelLower.includes('video') || modelLower.includes('veo') || modelLower.includes('grok') || modelLower.includes('sora')
   }
 
   const getModelDisplayName = (modelId) => {
     const modelNames = {
       'runninghub/nanobanana': '香蕉Pro',
+      'runninghub/bananaflash': '香蕉Flash',
       'runninghub/veo31': 'VEO3.1视频生成',
       'runninghub/sora2': 'Sora2 视频生成',
       'huoshan/image': '火山图片'
@@ -401,7 +408,7 @@ export default function PreviewArea({
           paddingBottom: '1rem'
         }}>
           {tasks.map((task, index) => {
-            const statusDisplay = getStatusDisplay(task.status, task.progress)
+            const statusDisplay = getStatusDisplay(task.status, task.progress, elapsedTime)
             const taskIsVideo = isVideo(task.modelName) || (task.resultUrl && task.resultUrl.includes('.mp4'))
             const hasResult = task.resultUrl && task.status === 'completed'
             // 视频用 16:9，图片用 9/16
@@ -607,31 +614,29 @@ export default function PreviewArea({
                   {/* 操作按钮 */}
                   {hasResult && (
                     <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
-                      <button
-                        onClick={() => {
-                          if (onAddReferenceUrl) {
-                            onAddReferenceUrl(task.resultUrl)
-                          }
-                        }}
-                        style={{
-                          flex: 1,
-                          padding: '0.5rem',
-                          background: 'var(--ai-accent-green)',
-                          border: 'none',
-                          borderRadius: '6px',
-                          color: '#000',
-                          fontSize: '0.75rem',
-                          fontWeight: 500,
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '0.25rem'
-                        }}
-                      >
-                        <ImageIcon size={14} />
-                        加入参考
-                      </button>
+                      {!isVideo(task.modelName) && onAddReferenceUrl && (
+                        <button
+                          onClick={() => onAddReferenceUrl(task.resultUrl)}
+                          style={{
+                            flex: 1,
+                            padding: '0.5rem',
+                            background: 'var(--ai-accent-green)',
+                            border: 'none',
+                            borderRadius: '6px',
+                            color: '#000',
+                            fontSize: '0.75rem',
+                            fontWeight: 500,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.25rem'
+                          }}
+                        >
+                          <ImageIcon size={14} />
+                          加入参考
+                        </button>
+                      )}
                       <button
                         onClick={() => handleDownload(task.resultUrl)}
                         style={{

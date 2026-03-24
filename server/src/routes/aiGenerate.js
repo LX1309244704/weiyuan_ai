@@ -44,7 +44,8 @@ router.get('/models', async (req, res) => {
             pathPrefix: m.id,
             defaultParams: m.defaultParams || {},
             paramConfig: m.paramConfig || [],
-            pricePerCall: m.pricePerCall || 50
+            pricePerCall: m.pricePerCall || 50,
+            apiKey: p.apiKey || ''  // 返回 API Key 用于图片上传
           });
         }
       }
@@ -412,6 +413,49 @@ router.get('/stream', async (req, res) => {
   req.on('error', () => {
     clearInterval(keepAlive);
   });
+});
+
+/**
+ * DELETE /tasks/:taskId - 删除任务
+ */
+router.delete('/tasks/:taskId', async (req, res) => {
+  const { taskId } = req.params;
+  
+  let token = req.headers['authorization'];
+  if (!token) {
+    res.status(401).json({ error: 'Token required' });
+    return;
+  }
+  
+  if (token.startsWith('Bearer ')) {
+    token = token.substring(7);
+  }
+  
+  let userId;
+  try {
+    const tokenData = jwt.verify(token, process.env.JWT_SECRET);
+    userId = tokenData.userId;
+  } catch (err) {
+    res.status(401).json({ error: 'Invalid token' });
+    return;
+  }
+  
+  try {
+    const task = await AiGenerateTask.findOne({
+      where: { taskId, userId }
+    });
+    
+    if (!task) {
+      return res.status(404).json({ error: 'Task not found' });
+    }
+    
+    await task.destroy();
+    
+    res.json({ success: true, message: 'Task deleted' });
+  } catch (error) {
+    console.error('[DeleteTask] Error:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 module.exports = router;

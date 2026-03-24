@@ -175,7 +175,8 @@ CREATE TABLE `ai_generate_tasks` (
   UNIQUE KEY `uk_task_id` (`task_id`),
   KEY `idx_user_id` (`user_id`),
   KEY `idx_provider` (`provider`),
-  KEY `idx_status` (`status`)
+  KEY `idx_status` (`status`),
+  KEY `idx_user_created` (`user_id`, `created_at` DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='AI生成任务表';
 
 -- =====================================================

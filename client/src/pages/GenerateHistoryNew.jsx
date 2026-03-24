@@ -36,6 +36,21 @@ function GenerateHistory() {
       fetchHistory()
     }
   }, [userApiKey, filter, typeFilter, page])
+
+  const handleDeleteTask = async (taskId) => {
+    if (!confirm('确定要删除这条记录吗？')) return
+    
+    try {
+      await api.delete(`/ai-generate/tasks/${taskId}`, {
+        headers: { Authorization: `Bearer ${userApiKey}` }
+      })
+      // 刷新列表
+      fetchHistory()
+    } catch (err) {
+      console.error('Failed to delete task:', err)
+      alert('删除失败')
+    }
+  }
   
   const fetchUserApiKey = async () => {
     try {
@@ -87,12 +102,13 @@ function GenerateHistory() {
     if (!item) return false
     const url = item.resultUrl || ''
     const model = (item.modelName || '').toLowerCase()
-    return url.includes('.mp4') || url.includes('.webm') || model.includes('veo') || model.includes('video') || model.includes('grok')
+    return url.includes('.mp4') || url.includes('.webm') || model.includes('veo') || model.includes('video') || model.includes('grok') || model.includes('sora')
   }
   
   const getModelDisplayName = (modelId) => {
     const modelNames = {
       'runninghub/nanobanana': '香蕉Pro',
+      'runninghub/bananaflash': '香蕉Flash',
       'runninghub/veo31': 'VEO3.1视频生成',
       'runninghub/sora2': 'Sora2 视频生成',
       'huoshan/image': '火山图片'
@@ -447,7 +463,25 @@ function GenerateHistory() {
                           <Calendar size={10} />
                           {dayjs(item.createdAt).format('MM-DD HH:mm')}
                         </div>
-                        <span style={{ fontWeight: 500 }}>{getModelDisplayName(item.modelName)}</span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <span style={{ fontWeight: 500 }}>{getModelDisplayName(item.modelName)}</span>
+                          <button
+                            onClick={() => handleDeleteTask(item.taskId)}
+                            style={{
+                              padding: '0.25rem',
+                              background: 'transparent',
+                              border: 'none',
+                              borderRadius: '4px',
+                              color: 'var(--ai-text-muted)',
+                              cursor: 'pointer',
+                              display: 'flex',
+                              alignItems: 'center'
+                            }}
+                            title="删除"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>

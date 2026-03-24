@@ -3,6 +3,7 @@ const Redis = require('ioredis');
 // Redis client for high-performance operations
 // Uses connection pooling for high concurrency (5000+ QPS)
 
+// 主 Redis 连接（用于常规操作）
 const redis = new Redis({
   host: process.env.REDIS_HOST || 'localhost',
   port: process.env.REDIS_PORT || 6379,
@@ -17,6 +18,39 @@ const redis = new Redis({
   connectTimeout: 10000,
   commandTimeout: 5000,
 });
+
+// Redis 连接池（用于高并发场景）
+const createRedisPool = () => {
+  return new Redis({
+    host: process.env.REDIS_HOST || 'localhost',
+    port: process.env.REDIS_PORT || 6379,
+    password: process.env.REDIS_PASSWORD || undefined,
+    maxRetriesPerRequest: 3,
+    family: 4,
+    keepAlive: 30000,
+    connectTimeout: 10000,
+    commandTimeout: 5000,
+  });
+};
+
+// 预创建连接池
+const redisPool = {
+  connections: [],
+  getConnection() {
+    if (this.connections.length < 10) {
+      const conn = createRedisPool();
+      this.connections.push(conn);
+      return conn;
+    }
+    return this.connections[Math.floor(Math.random() * this.connections.length)];
+  }
+};
+
+// 初始化连接池
+for (let i = 0; i < 5; i++) {
+  redisPool.connections.push(createRedisPool());
+}
+console.log(`Redis connection pool initialized with ${redisPool.connections.length} connections`);
 
 // Redis keys pattern
 const KEYS = {
@@ -55,6 +89,7 @@ redis.on('error', (err) => {
 
 module.exports = {
   redis,
+  redisPool,
   KEYS,
   TTL,
 };

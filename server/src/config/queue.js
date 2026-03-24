@@ -99,14 +99,20 @@ async function addTaskToQueue(taskDbId, taskData) {
   console.log(`[Queue] Added task ${taskDbId} to queue`);
 }
 
+// Worker 并发数配置
+const WORKER_CONCURRENCY = parseInt(process.env.WORKER_CONCURRENCY) || 3;
+
 /**
  * 创建轮询 Worker
+ * @param {number} concurrency - 并发处理任务数，默认 3，可通过环境变量 WORKER_CONCURRENCY 调整
  */
-function createPollingWorker() {
+function createPollingWorker(concurrency = WORKER_CONCURRENCY) {
+  console.log(`[Worker] Creating worker with concurrency: ${concurrency}`);
+  
   const worker = new Worker('ai-generate-tasks', async (job) => {
     const { taskDbId, provider: providerName, taskId } = job.data;
     
-    console.log(`[Worker] Processing task ${taskId}`);
+    console.log(`[Worker] Processing task ${taskId} (active jobs: ${worker.activeJobs})`);
     
     // 幂等检查：再次查询任务状态，如果已完成或已退款则跳过
     const task = await AiGenerateTask.findByPk(taskDbId);

@@ -35,13 +35,59 @@ class RunningHubProvider extends BaseProvider {
           label: '宽高比',
           type: 'select',
           options: [
-            { value: '1:1', label: '1:1 (正方形)' },
-            { value: '3:4', label: '3:4 (竖版)' },
-            { value: '4:3', label: '4:3 (横版)' },
-            { value: '9:16', label: '9:16 (手机竖版)' },
-            { value: '16:9', label: '16:9 (横屏)' }
+            { value: '1:1', label: '1:1' },
+            { value: '16:9', label: '16:9' },
+            { value: '9:16', label: '9:16' },
+            { value: '4:3', label: '4:3' },
+            { value: '3:4', label: '3:4' },
+            { value: '3:2', label: '3:2' },
+            { value: '2:3', label: '2:3' },
+            { value: '5:4', label: '5:4' },
+            { value: '4:5', label: '4:5' },
+            { value: '21:9', label: '21:9' }
           ],
           default: '1:1'
+        }
+      ]
+    },
+    // 图片模型 - 香蕉Flash (全能图片V2)
+    {
+      id: 'runninghub/bananaflash',
+      name: '香蕉Flash',
+      description: '全能图片V2，高并发极速响应，支持文生图和图生图',
+      type: 'image',
+      icon: '⚡',
+      pricePerCall: 30,
+      defaultParams: { resolution: '1k', aspectRatio: '9:16' },
+      paramConfig: [
+        {
+          name: 'resolution',
+          label: '分辨率',
+          type: 'select',
+          options: [
+            { value: '1k', label: '1K (低清)' },
+            { value: '2k', label: '2K (高清)' },
+            { value: '4k', label: '4K (超清)' }
+          ],
+          default: '1k'
+        },
+        {
+          name: 'aspectRatio',
+          label: '宽高比',
+          type: 'select',
+          options: [
+            { value: '1:1', label: '1:1' },
+            { value: '16:9', label: '16:9' },
+            { value: '9:16', label: '9:16' },
+            { value: '4:3', label: '4:3' },
+            { value: '3:4', label: '3:4' },
+            { value: '3:2', label: '3:2' },
+            { value: '2:3', label: '2:3' },
+            { value: '5:4', label: '5:4' },
+            { value: '4:5', label: '4:5' },
+            { value: '21:9', label: '21:9' }
+          ],
+          default: '9:16'
         }
       ]
     },
@@ -138,6 +184,9 @@ class RunningHubProvider extends BaseProvider {
       'runninghub/nanobanana': (hasImage) => hasImage 
         ? 'https://www.runninghub.cn/openapi/v2/rhart-image-n-pro/edit'
         : 'https://www.runninghub.cn/openapi/v2/rhart-image-n-pro/text-to-image',
+      'runninghub/bananaflash': (hasImage) => hasImage
+        ? 'https://www.runninghub.cn/openapi/v2/rhart-image-n-g31-flash/image-to-image'
+        : 'https://www.runninghub.cn/openapi/v2/rhart-image-n-g31-flash/text-to-image',
       'runninghub/sora2': (hasImage) => hasImage
         ? 'https://www.runninghub.cn/openapi/v2/rhart-video-s/image-to-video'
         : 'https://www.runninghub.cn/openapi/v2/rhart-video-s/text-to-video',
@@ -193,6 +242,11 @@ class RunningHubProvider extends BaseProvider {
       body.aspectRatio = aspectRatio || '9:16';
       body.duration = duration || '10';
       body.storyboard = false;
+    } else if (this.modelId === 'runninghub/bananaflash') {
+      // 香蕉Flash (文生图/图生图合一)
+      body.resolution = resolution || '1k';
+      if (aspectRatio) body.aspectRatio = aspectRatio;
+      if (imageUrls && imageUrls.length > 0) body.imageUrls = imageUrls;
     } else if (this.modelId === 'runninghub/sora2x') {
       // 全能视频X (文生视频)
       body.aspectRatio = aspectRatio || '2:3';
@@ -234,6 +288,10 @@ class RunningHubProvider extends BaseProvider {
       return requestBody.imageUrls && requestBody.imageUrls.length > 0
         ? 'https://www.runninghub.cn/openapi/v2/rhart-image-n-pro/edit'
         : 'https://www.runninghub.cn/openapi/v2/rhart-image-n-pro/text-to-image';
+    } else if (modelId === 'runninghub/bananaflash') {
+      return requestBody.imageUrls && requestBody.imageUrls.length > 0
+        ? 'https://www.runninghub.cn/openapi/v2/rhart-image-n-g31-flash/image-to-image'
+        : 'https://www.runninghub.cn/openapi/v2/rhart-image-n-g31-flash/text-to-image';
     } else if (modelId === 'runninghub/sora2' || modelId === 'runninghub/sora2x') {
       return requestBody.imageUrl
         ? 'https://www.runninghub.cn/openapi/v2/rhart-video-s/image-to-video'

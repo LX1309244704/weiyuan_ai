@@ -1,17 +1,20 @@
 import { useState, useCallback } from 'react'
 import { Upload, X, Image as ImageIcon } from 'lucide-react'
+import api from '../../utils/api'
 
 const MAX_IMAGES = 10
 
-const readFileAsBase64 = (file) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => {
-      resolve(reader.result)
-    }
-    reader.onerror = reject
-    reader.readAsDataURL(file)
+// 上传图片到后端
+const uploadImageToServer = async (file) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  
+  const response = await api.post('/upload/image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
   })
+  
+  console.log('Upload response:', response.data)
+  return response.data.url
 }
 
 export default function ReferenceUpload({ images = [], onChange }) {
@@ -20,19 +23,36 @@ export default function ReferenceUpload({ images = [], onChange }) {
   const handleFiles = useCallback(async (files) => {
     const fileArray = Array.from(files).filter(file => file.type.startsWith('image/'))
     
-    const newImages = await Promise.all(
-      fileArray.map(async (file) => {
-        const base64 = await readFileAsBase64(file)
-        return {
-          file,
-          url: base64,
-          id: `${Date.now()}-${Math.random()}`
-        }
-      })
-    )
+    // 创建临时预览
+    const tempImages = fileArray.map(file => ({
+      file,
+      url: URL.createObjectURL(file),
+      id: `${Date.now()}-${Math.random()}`
+    }))
     
-    const allImages = [...images, ...newImages].slice(0, MAX_IMAGES)
+    const allImages = [...images, ...tempImages].slice(0, MAX_IMAGES)
     onChange?.(allImages)
+    
+    // 后台上传每个图片
+    for (const img of tempImages) {
+      try {
+        console.log('Uploading image:', img.id)
+        const uploadedUrl = await uploadImageToServer(img.file)
+        console.log('Uploaded URL:', uploadedUrl)
+        
+        // 释放临时 URL 并更新为真实 URL
+        URL.revokeObjectURL(img.url)
+        onChange?.(prev => prev.map(p => 
+          p.id === img.id ? { ...p, url: uploadedUrl, file: null } : p
+        ))
+      } catch (err) {
+        console.error('Upload failed:', err)
+        // 保留本地预览
+        onChange?.(prev => prev.map(p => 
+          p.id === img.id ? { ...p, file: null } : p
+        ))
+      }
+    }
   }, [images, onChange])
   
   const handleDragOver = useCallback((e) => {
@@ -53,6 +73,8 @@ export default function ReferenceUpload({ images = [], onChange }) {
   
   const handleInputChange = useCallback((e) => {
     handleFiles(e.target.files)
+    // 清空 input value，允许重复选择相同文件
+    e.target.value = ''
   }, [handleFiles])
   
   const handleRemove = useCallback((id) => {

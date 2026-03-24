@@ -32,8 +32,11 @@ app.use('/api/', generalLimiter);
 app.use('/api/auth', authLimiter);
 
 // Body parsing
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// File upload - multer 仅在上传路由中使用 (避免与 express.json 冲突)
+// 路由层面应用见 routes/upload.js
 
 // Health check
 app.get('/health', (req, res) => {
@@ -48,6 +51,7 @@ app.use('/api/billing', require('./routes/billing'));
 app.use('/api/payment', require('./routes/payment'));
 app.use('/api/proxy', require('./routes/proxy'));
 app.use('/api/generate', require('./routes/generate'));
+app.use('/api/upload', require('./routes/upload'));
 const aiGenerateRouter = require('./routes/aiGenerate');
 app.use('/api/ai-generate', aiGenerateRouter);
 app.use('/api/coupon', require('./routes/coupon'));
@@ -163,9 +167,23 @@ async function startServer() {
 
     await initializeBalanceCache();
 
-    // 启动 BullMQ Worker
-    pollingWorker = createPollingWorker();
-    console.log('BullMQ Worker started');
+    // 启动 BullMQ Worker（支持多实例并发处理）
+    // 4核8G 服务器推荐: 2 Worker + 3 并发 = 6 总并发
+    const workerConcurrency = parseInt(process.env.WORKER_CONCURRENCY) || 3;
+    const workerCount = parseInt(process.env.WORKER_COUNT) || 2;
+    
+    console.log(`Starting ${workerCount} Worker(s), each with ${workerConcurrency} concurrency`);
+    
+    // 创建多个 Worker 实例
+    const workers = [];
+    for (let i = 0; i < workerCount; i++) {
+      const worker = createPollingWorker(workerConcurrency);
+      workers.push(worker);
+      console.log(`Worker ${i + 1}/${workerCount} started`);
+    }
+    
+    // 保存第一个 Worker 作为主引用（用于关闭等操作）
+    pollingWorker = workers[0];
 
     // 延迟恢复未完成的任务（等待 Worker 启动）
     setTimeout(async () => {

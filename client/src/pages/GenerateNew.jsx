@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../context/AuthContext'
 import api from '../utils/api'
+import { uploadToRunningHub, base64ToFile } from '../utils/upload'
 import TopNavigationBar from '../components/TopNavigationBar'
 import ModelSelector from '../components/generate/ModelSelector'
 import ReferenceUpload from '../components/generate/ReferenceUpload'
@@ -34,6 +35,10 @@ export default function GenerateNew() {
   const [userApiKey, setUserApiKey] = useState('')
   const [balance, setBalance] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // 判断当前模型是否支持参考图（纯视频模型不支持）
+  const isImageModel = selectedModel?.type === 'image'
+  const canUseReference = isImageModel || selectedModel?.id === 'runninghub/sora2'
     
   useEffect(() => {
     fetchApiEndpoints()
@@ -92,7 +97,8 @@ export default function GenerateNew() {
           pathPrefix: m.pathPrefix,
           defaultParams: m.defaultParams || {},
           paramConfig: m.paramConfig || [],  // 参数配置
-          pricePerCall: m.pricePerCall
+          pricePerCall: m.pricePerCall,
+          apiKey: m.apiKey || ''  // 模型对应的 API Key
         }))
         setModels(formattedModels)
         setSelectedModel(formattedModels[0])
@@ -202,24 +208,66 @@ export default function GenerateNew() {
     setError(null)
     
     // 添加新任务到列表（只在 GenerateNew 本地显示）
+    const taskTimestamp = Date.now()
     const newTask = {
-      taskId: `pending_${Date.now()}`,
+      taskId: `pending_${taskTimestamp}`,
       prompt: currentPrompt,
       modelName: selectedModel.name,
       status: 'queued',
       progress: 0,
-      createdAt: new Date()
+      createdAt: new Date(),
+      taskTimestamp  // 用于匹配
     }
     setTasks(prev => [newTask, ...prev])
     
     try {
+      // 上传本地参考图片到 RunningHub
+      let imageUrls = []
+      
+      console.log('========== DEBUG UPLOAD ==========')
+      console.log('currentImages:', currentImages)
+      console.log('selectedModel.apiKey:', selectedModel?.apiKey)
+      console.log('selectedModel:', selectedModel?.name, selectedModel?.id)
+      console.log('====================================')
+      
+      // 检查图片是否已经上传（是 HTTPS URL 则是已上传）
+      for (const img of currentImages) {
+        if (img && img.url) {
+          // 如果已经是远程 URL，直接使用
+          if (img.url.startsWith('http://') || img.url.startsWith('https://')) {
+            console.log('Image already uploaded:', img.id, img.url)
+            imageUrls.push(img.url)
+          } else if (img.url.startsWith('data:')) {
+            // base64 图片，需要上传
+            try {
+              console.log('Converting and uploading image:', img.id)
+              const file = base64ToFile(img.url, `reference_${img.id}.png`)
+              console.log('File created, calling upload API...')
+              const uploadedUrl = await uploadToRunningHub(file, selectedModel.apiKey)
+              console.log('Uploaded URL:', uploadedUrl)
+              imageUrls.push(uploadedUrl)
+            } catch (uploadErr) {
+              console.error('Upload failed, using original:', uploadErr)
+              imageUrls.push(img.url)
+            }
+          }
+        }
+      }
+      
+      /*
+      if (currentImages.length > 0 && selectedModel?.apiKey) {
+        // 上传到 RunningHub
+        for (const img of currentImages) {
+      }
+      */
+      
       const requestBody = {
         prompt: currentPrompt,
         ...currentParams
       }
       
-      if (currentImages.length > 0) {
-        requestBody.imageUrls = currentImages.map(img => img.url)
+      if (imageUrls.length > 0) {
+        requestBody.imageUrls = imageUrls
       }
       
       const response = await api.post(`/ai-generate/${selectedModel.pathPrefix}`, requestBody, {
@@ -232,9 +280,9 @@ export default function GenerateNew() {
         if (data.taskId) {
           const taskStatus = data.status || 'queued'
           const resultUrl = data.resultUrl || data.result?.[0] || null
-          // 更新本地任务
+          // 更新本地任务 - 使用 taskTimestamp 匹配
           setTasks(prev => prev.map(t => 
-            t.taskId === newTask.taskId 
+            t.taskTimestamp === taskTimestamp 
               ? { ...t, taskId: data.taskId, realTaskId: data.taskId, status: resultUrl ? 'completed' : taskStatus, progress: resultUrl ? 100 : 0, resultUrl }
               : t
           ))
@@ -323,10 +371,12 @@ export default function GenerateNew() {
             onSelect={setSelectedModel}
           />
           
-          <ReferenceUpload
-            images={referenceImages}
-            onChange={setReferenceImages}
-          />
+          {canUseReference && (
+            <ReferenceUpload
+              images={referenceImages}
+              onChange={setReferenceImages}
+            />
+          )}
           
           <PromptInput
             value={prompt}

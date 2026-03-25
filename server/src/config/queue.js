@@ -179,11 +179,30 @@ function createPollingWorker(concurrency = WORKER_CONCURRENCY) {
               );
             });
             
-            sendTaskUpdate(task.userId, { taskId: task.taskId, status: 'completed', resultUrl });
+            // 获取用户最新余额
+            const user = await User.findByPk(task.userId, { attributes: ['balance'] });
+            const newBalance = user ? user.balance : 0;
+            
+            sendTaskUpdate(task.userId, { 
+              taskId: task.taskId, 
+              status: 'completed', 
+              resultUrl,
+              balance: newBalance
+            });
           } else {
             await task.update({ status: 'failed', errorMessage: result.error });
-            await refundTaskCost(task.userId, task.cost, task.taskId, taskDbId);
-            sendTaskUpdate(task.userId, { taskId: task.taskId, status: 'failed', message: '已退款' });
+            const refundResult = await refundTaskCost(task.userId, task.cost, task.taskId, taskDbId);
+            
+            // 获取用户最新余额
+            const user = await User.findByPk(task.userId, { attributes: ['balance'] });
+            const newBalance = user ? user.balance : 0;
+            
+            sendTaskUpdate(task.userId, { 
+              taskId: task.taskId, 
+              status: 'failed', 
+              message: '已退款',
+              balance: newBalance
+            });
           }
           return; // 任务完成
         }

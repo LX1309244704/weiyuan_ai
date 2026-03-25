@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Download, Maximize2, Video, Image as ImageIcon, Clock, Loader2, CheckCircle, XCircle, RefreshCw, Trash2 } from 'lucide-react'
 import api from '../../utils/api'
+import { useAuthStore } from '../../context/AuthContext'
 
 export default function PreviewArea({ 
   generating, 
@@ -191,6 +192,12 @@ export default function PreviewArea({
   // 处理 SSE 事件
   const handleSSEUpdate = useCallback((data) => {
     if (!data.taskId) return
+    
+    // 如果 SSE 消息包含余额，更新 auth store
+    if (data.balance !== undefined) {
+      const { updateUser } = useAuthStore.getState()
+      updateUser({ balance: data.balance })
+    }
 
     setTasks(prev => {
       const taskIndex = prev.findIndex(t => t.taskId === data.taskId || t.realTaskId === data.taskId)
@@ -203,7 +210,7 @@ export default function PreviewArea({
           status: data.status,
           progress: data.progress ?? t.progress,
           resultUrl: data.resultUrl || t.resultUrl,
-          errorMessage: data.errorMessage || t.errorMessage
+          errorMessage: data.errorMessage || data.message || t.errorMessage
         }
       })
     })

@@ -3,10 +3,13 @@ import { useAuthStore } from '../context/AuthContext'
 import { User, Sparkles, Plug, FileText, UserCircle2, LogOut, Settings, Coins, DollarSign } from 'lucide-react'
 import '../styles/generate.css'
 
-export default function TopNavigationBar({ title = "Weiyuan AI", balance = 0 }) {
+export default function TopNavigationBar({ title = "Weiyuan AI" }) {
   const navigate = useNavigate()
   const location = useLocation()
   const { user, isAuthenticated, logout } = useAuthStore()
+  
+  // 直接从 user 对象读取余额
+  const balance = user?.balance || 0
   
   const handleLogout = () => {
     logout()

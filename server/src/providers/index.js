@@ -22,12 +22,15 @@ class ProviderManager {
           const ProviderClass = require(path.join(providersDir, file));
           if (ProviderClass && ProviderClass.provider) {
             this.providers.set(ProviderClass.provider, ProviderClass);
+            console.log(`[Provider] Loaded: ${ProviderClass.provider}`);
           }
         } catch (err) {
+          console.error(`[Provider] Failed to load ${file}:`, err.message);
         }
       }
     }
     
+    console.log(`[Provider] Total loaded: ${this.providers.size} providers`);
   }
 
   /**

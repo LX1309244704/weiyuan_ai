@@ -114,6 +114,9 @@ async function checkRateLimit(userId, endpointId, limit) {
 }
 
 function buildTargetHeaders(endpoint, userHeaders) {
+  console.log('[PROXY] buildTargetHeaders - endpoint.authType:', endpoint.authType);
+  console.log('[PROXY] buildTargetHeaders - endpoint.headersMapping:', endpoint.headersMapping);
+  console.log('[PROXY] buildTargetHeaders - userHeaders:', userHeaders);
   
   const headers = {
     'Content-Type': 'application/json',
@@ -180,6 +183,8 @@ function transformRequestBody(requestExample, clientBody) {
     const params = { ...clientBody };
     delete params.prompt;
     
+    console.log('[PROXY] Transform - prompt:', prompt);
+    console.log('[PROXY] Transform - params:', params);
 
     const result = { ...example };
     
@@ -204,8 +209,10 @@ function transformRequestBody(requestExample, clientBody) {
       }
     }
 
+    console.log('[PROXY] Transformed body:', JSON.stringify(result, null, 2));
     return result;
   } catch (e) {
+    console.error('[PROXY] Failed to transform request body:', e.message);
     return clientBody;
   }
 }
@@ -233,14 +240,17 @@ async function waitForTaskCompletion(endpoint, taskId, maxWaitTime = 120000, pol
       );
       
       const statusData = statusResponse.data;
+      console.log('[PROXY] Task status:', statusData);
       
       if (statusData.data === 'SUCCESS') {
         return { completed: true, success: true };
       } else if (statusData.data === 'FAILED') {
         return { completed: true, success: false, error: 'Task failed' };
       } else if (statusData.data === 'QUEUED' || statusData.data === 'RUNNING') {
+        console.log('[PROXY] Task still', statusData.data, '- waiting...');
       }
     } catch (err) {
+      console.error('[PROXY] Error checking task status:', err.message);
     }
   }
   
@@ -278,6 +288,7 @@ router.use(async (req, res, next) => {
     }
 
     const pathParts = req.path.split('/').filter(Boolean);
+    console.log('[PROXY] Request path:', req.path, 'pathParts:', pathParts);
     if (pathParts.length === 0) {
       return res.status(400).json({ 
         success: false,
@@ -287,6 +298,7 @@ router.use(async (req, res, next) => {
     }
 
     const fullPath = pathParts.join('/');
+    console.log('[PROXY] Looking for endpoint with pathPrefix:', fullPath);
     
     endpoint = await ApiEndpoint.findOne({
       where: {
@@ -301,6 +313,7 @@ router.use(async (req, res, next) => {
         attributes: ['id', 'name', 'pathPrefix', 'isActive'],
         limit: 10 
       });
+      console.log('[PROXY] Available endpoints:', allEndpoints.map(e => ({ pathPrefix: e.pathPrefix, isActive: e.isActive })));
       
       return res.status(404).json({ 
         success: false,
@@ -310,6 +323,7 @@ router.use(async (req, res, next) => {
     }
 
     cost = endpoint.pricePerCall;
+    console.log(`[PROXY] Endpoint found: ${endpoint.name}, cost: ${cost} points`);
 
     const rateLimitResult = await checkRateLimit(user.id, endpoint.id, endpoint.rateLimit);
     if (!rateLimitResult.allowed) {
@@ -344,6 +358,7 @@ router.use(async (req, res, next) => {
       currentBalance = parseInt(currentBalance, 10);
     }
 
+    console.log(`[PROXY] User ${user.id} balance: ${currentBalance} points, cost: ${cost} points`);
     
     if (currentBalance < cost) {
       return res.status(402).json({
@@ -357,6 +372,7 @@ router.use(async (req, res, next) => {
     }
 
     const newBalance = await redis.decrby(balanceKey, cost);
+    console.log(`[PROXY] Deducted ${cost} points, new balance: ${newBalance} points`);
     
     await redis.set(idempotencyKey, JSON.stringify({ 
       success: true, 
@@ -380,6 +396,10 @@ router.use(async (req, res, next) => {
     const targetHeaders = buildTargetHeaders(endpoint, req.headers);
 
     const transformedBody = transformRequestBody(endpoint.requestExample, req.body);
+    console.log('[PROXY] Original body:', JSON.stringify(req.body, null, 2));
+    console.log('[PROXY] Transformed body:', JSON.stringify(transformedBody, null, 2));
+    console.log('[PROXY] Target URL:', targetUrl);
+    console.log('[PROXY] Target Headers:', JSON.stringify(targetHeaders, null, 2));
 
     let response;
     try {
@@ -394,18 +414,36 @@ router.use(async (req, res, next) => {
         maxContentLength: 50 * 1024 * 1024
       };
 
+      console.log('========== API REQUEST START ==========');
+      console.log('[PROXY] Request URL:', axiosConfig.url);
+      console.log('[PROXY] Request Method:', axiosConfig.method);
+      console.log('[PROXY] Request Headers:', JSON.stringify(axiosConfig.headers, null, 2));
+      console.log('[PROXY] Request Body:', JSON.stringify(axiosConfig.data, null, 2));
+      console.log('========== API REQUEST END ==========');
 
       response = await axios(axiosConfig);
 
+      console.log('========== API RESPONSE START ==========');
+      console.log('[PROXY] Response Status:', response.status);
+      console.log('[PROXY] Response StatusText:', response.statusText);
+      console.log('[PROXY] Response Headers:', JSON.stringify(response.headers, null, 2));
+      console.log('[PROXY] Response Body:', JSON.stringify(response.data, null, 2));
+      console.log('========== API RESPONSE END ==========');
     } catch (proxyError) {
+      console.log('========== API REQUEST FAILED ==========');
+      console.error('[PROXY] Request Error:', proxyError.message);
+      console.error('[PROXY] Request Error Code:', proxyError.code);
+      console.error('[PROXY] Request Error Config:', proxyError.config ? {
         url: proxyError.config.url,
         method: proxyError.config.method,
         headers: proxyError.config.headers,
         data: proxyError.config.data
       } : 'No config available');
+      console.error('[PROXY] Request Error Response:', proxyError.response ? {
         status: proxyError.response.status,
         data: proxyError.response.data
       } : 'No response available');
+      console.log('========== END FAILED ==========');
       
       const isTimeout = proxyError.code === 'ECONNABORTED' || proxyError.code === 'ETIMEDOUT';
       
@@ -502,6 +540,7 @@ router.use(async (req, res, next) => {
         }, { transaction: t });
       });
       
+      console.log(`[PROXY] Upstream API error, refunded ${cost} points, response: ${response.status}`);
     } else {
       // 正常扣费，使用事务保证一致性
       await sequelize.transaction(async (t) => {
@@ -540,6 +579,7 @@ router.use(async (req, res, next) => {
         await redis.set(balanceKey, newDbBalance, 'EX', TTL.INVOCATION_CHECK);
       });
       
+      console.log(`[PROXY] Invocation saved: ${invocationId}, cost=${cost} points, user=${user.id}`);
     }
 
     const result = {
@@ -551,16 +591,20 @@ router.use(async (req, res, next) => {
     };
 
     if (response.status < 400 && response.data.taskId) {
+      console.log('[PROXY] Task submitted, waiting for completion:', response.data.taskId);
       
       const taskResult = await waitForTaskCompletion(endpoint, response.data.taskId);
       
       if (taskResult.completed) {
         if (taskResult.success) {
+          console.log('[PROXY] Task completed successfully');
           result.data = { ...result.data, status: 'SUCCESS', completed: true };
         } else {
+          console.log('[PROXY] Task failed:', taskResult.error);
           result.data = { ...result.data, status: 'FAILED', error: taskResult.error, completed: true };
         }
       } else {
+        console.log('[PROXY] Task polling timeout, returning taskId for client to poll');
         result.data = { ...result.data, status: 'RUNNING', taskId: response.data.taskId };
       }
     }
@@ -570,6 +614,7 @@ router.use(async (req, res, next) => {
     res.status(response.status).json(result);
 
   } catch (error) {
+    console.error('[PROXY] Error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error',

@@ -24,10 +24,12 @@ router.post('/image', upload.single('file'), async (req, res) => {
     const file = req.file
     
     // 获取 RunningHub API Key
+    console.log('[Upload] Looking for RunningHub model...')
     const model = await AiModel.findOne({
       where: { provider: 'runninghub', isActive: true }
     })
     
+    console.log('[Upload] Found model:', model ? 'yes' : 'no', model ? ', has apiKey: ' + !!model.apiKey : '')
     
     if (!model || !model.apiKey) {
       return res.status(400).json({ error: 'RunningHub API Key not configured' })
@@ -35,6 +37,7 @@ router.post('/image', upload.single('file'), async (req, res) => {
     
     // 解密 API Key
     const apiKey = decrypt(model.apiKey) || model.apiKey
+    console.log('[Upload] API Key decrypted, length:', apiKey?.length)
     
     // 上传到 RunningHub - 使用 form-data 包
     const FormData = require('form-data')
@@ -44,6 +47,7 @@ router.post('/image', upload.single('file'), async (req, res) => {
       contentType: file.mimetype
     })
     
+    console.log('[Upload] Uploading to RunningHub, file:', file.originalname)
     
     let response
     try {
@@ -58,10 +62,15 @@ router.post('/image', upload.single('file'), async (req, res) => {
           timeout: 60000
         }
       )
+      console.log('[Upload] RunningHub response:', JSON.stringify(response.data))
     } catch (rhError) {
+      console.error('[Upload] RunningHub error:', rhError.message)
+      console.error('[Upload] RunningHub response data:', rhError.response?.data)
+      console.error('[Upload] RunningHub status:', rhError.response?.status)
       throw rhError
     }
     
+    console.log('[Upload] Response data:', JSON.stringify(response.data))
     
     // 检查成功响应
     if (response.data.code === 0 && response.data.data?.download_url) {
@@ -78,6 +87,8 @@ router.post('/image', upload.single('file'), async (req, res) => {
     
     return res.status(500).json({ error: 'Upload failed', details: response.data })
   } catch (error) {
+    console.error('[Upload] Error:', error.message)
+    console.error('[Upload] Stack:', error.stack)
     return res.status(500).json({ error: error.message, details: error.stack })
   }
 })

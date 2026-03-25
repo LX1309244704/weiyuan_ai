@@ -340,6 +340,7 @@ class RunningHubProvider extends BaseProvider {
     
     // 检查 token 错误 - 不退款，继续重试（可能是临时问题）
     if (data.code === 412 || data.msg?.includes('TOKEN_INVALID')) {
+      console.warn('[RunningHub] Token invalid, continuing to poll');
       return { completed: false, status: 'processing', progress: 0 };
     }
     
@@ -360,6 +361,7 @@ class RunningHubProvider extends BaseProvider {
       return { completed: false, status: 'queued', progress: 0 };
     }
 
+    console.log('[RunningHub] Unknown status:', status, 'Full response:', data);
     return { completed: false, status: status || 'unknown', progress: 0 };
   }
 }

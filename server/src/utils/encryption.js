@@ -50,6 +50,7 @@ function decrypt(encryptedData) {
     
     return decrypted;
   } catch (error) {
+    console.error('Decryption failed:', error.message);
     return null;
   }
 }

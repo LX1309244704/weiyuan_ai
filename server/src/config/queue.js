@@ -38,6 +38,7 @@ async function refundTaskCost(userId, cost, taskId, taskDbId) {
       // 检查是否已退款
       const task = await AiGenerateTask.findByPk(taskDbId, { transaction: t });
       if (task && task.refundAmount > 0) {
+        console.log(`[Refund] Task ${taskDbId} already refunded`);
         return null;
       }
       
@@ -60,6 +61,7 @@ async function refundTaskCost(userId, cost, taskId, taskDbId) {
       return balance;
     });
   } catch (error) {
+    console.error('[Refund] Error:', error.message);
   }
 }
 
@@ -78,6 +80,7 @@ async function addTaskToQueue(taskDbId, taskData) {
   if (existingJob) {
     const state = await existingJob.getState();
     if (state === 'completed' || state === 'active') {
+      console.log(`[Queue] Task ${taskDbId} already exists with state: ${state}`);
       return;
     }
   }
@@ -93,6 +96,7 @@ async function addTaskToQueue(taskDbId, taskData) {
       backoff: false // 禁用自动重试，我们在代码中手动控制
     }
   );
+  console.log(`[Queue] Added task ${taskDbId} to queue`);
 }
 
 // Worker 并发数配置
@@ -103,25 +107,30 @@ const WORKER_CONCURRENCY = parseInt(process.env.WORKER_CONCURRENCY) || 3;
  * @param {number} concurrency - 并发处理任务数，默认 3，可通过环境变量 WORKER_CONCURRENCY 调整
  */
 function createPollingWorker(concurrency = WORKER_CONCURRENCY) {
+  console.log(`[Worker] Creating worker with concurrency: ${concurrency}`);
   
   const worker = new Worker('ai-generate-tasks', async (job) => {
     const { taskDbId, provider: providerName, taskId } = job.data;
     
+    console.log(`[Worker] Processing task ${taskId} (active jobs: ${worker.activeJobs})`);
     
     // 幂等检查：再次查询任务状态，如果已完成或已退款则跳过
     const task = await AiGenerateTask.findByPk(taskDbId);
     if (!task) {
+      console.log(`[Worker] Task ${taskDbId} not found`);
       return;
     }
     
     // 如果任务已完成，直接返回
     if (task.status === 'completed' && task.resultUrl) {
+      console.log(`[Worker] Task ${taskDbId} already completed`);
       sendTaskUpdate(task.userId, { taskId: task.taskId, status: 'completed', resultUrl: task.resultUrl });
       return;
     }
     
     // 如果任务已失败且已退款，跳过
     if (task.status === 'failed' && task.refundAmount > 0) {
+      console.log(`[Worker] Task ${taskDbId} already failed and refunded`);
       return;
     }
     
@@ -137,11 +146,13 @@ function createPollingWorker(concurrency = WORKER_CONCURRENCY) {
     
     const providerHandler = providerManager.get(providerName, mergedConfig);
     if (!providerHandler) {
+      console.error(`[Worker] No provider for ${providerName}`);
       return;
     }
     
     const pollConfig = providerHandler.buildPollRequest(task.taskId);
     if (!pollConfig) {
+      console.error(`[Worker] No poll config for task ${taskId}`);
       return;
     }
     
@@ -182,6 +193,7 @@ function createPollingWorker(concurrency = WORKER_CONCURRENCY) {
         sendTaskUpdate(task.userId, { taskId: task.taskId, status: result.status, progress: result.progress });
         
       } catch (error) {
+        console.error(`[Worker] Poll error for ${taskId}:`, error.message);
         
         // 如果是客户端错误（4xx），标记失败
         const httpStatus = error.response?.status;
@@ -212,9 +224,11 @@ function createPollingWorker(concurrency = WORKER_CONCURRENCY) {
   });
   
   worker.on('completed', (job) => {
+    console.log(`[Worker] Job ${job.id} completed`);
   });
   
   worker.on('failed', (job, err) => {
+    console.error(`[Worker] Job ${job?.id} failed:`, err.message);
   });
   
   return worker;
@@ -225,11 +239,13 @@ function createPollingWorker(concurrency = WORKER_CONCURRENCY) {
  */
 async function recoverPendingTasks() {
   try {
+    console.log('[Recovery] Starting task recovery...');
     
     const pendingTasks = await AiGenerateTask.findAll({
       where: { status: ['queued', 'processing'] }
     });
     
+    console.log(`[Recovery] Found ${pendingTasks.length} pending tasks`);
     
     for (const task of pendingTasks) {
       await addTaskToQueue(task.id, {
@@ -240,7 +256,9 @@ async function recoverPendingTasks() {
       });
     }
     
+    console.log('[Recovery] Done');
   } catch (error) {
+    console.error('[Recovery] Failed:', error.message);
   }
 }
 

@@ -138,6 +138,8 @@ router.post('/*', async (req, res) => {
     }
     if (!apiUrl) throw new Error('API URL not defined');
     
+    console.log('[AIGenerate] Request to:', apiUrl);
+    console.log('[AIGenerate] Request body:', JSON.stringify(requestBody));
     
     // 发送请求
     const response = await axios({
@@ -148,15 +150,18 @@ router.post('/*', async (req, res) => {
       timeout: 300000
     });
     
+    console.log('[AIGenerate] Response:', JSON.stringify(response.data));
     
     // 解析响应
     const result = providerHandler.parseResponse(response);
+    console.log('[AIGenerate] Parse result:', JSON.stringify(result));
     const taskId = result.taskId || `gen_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     // 防重复：检查是否已存在相同 taskId 的任务
     if (result.taskId) {
       const existingTask = await AiGenerateTask.findOne({ where: { taskId: result.taskId } });
       if (existingTask) {
+        console.log('[AIGenerate] Task already exists:', result.taskId);
         return res.json({
           success: true,
           taskId: existingTask.taskId,
@@ -169,6 +174,7 @@ router.post('/*', async (req, res) => {
     
     // API 调用失败：不扣余额，直接返回
     if (!result.success) {
+      console.log('[AIGenerate] API failed, NOT deducting balance. Current balance:', user.balance);
       
       // 创建失败任务记录（不扣费）
       await AiGenerateTask.create({
@@ -193,6 +199,7 @@ router.post('/*', async (req, res) => {
       });
     }
     
+    console.log('[AIGenerate] API success, deducting balance. Cost:', cost, 'Current balance:', user.balance);
     
     // API 调用成功：在事务内扣余额
     const aiTask = await sequelize.transaction(async (t) => {
@@ -257,6 +264,7 @@ router.post('/*', async (req, res) => {
     });
     
   } catch (error) {
+    console.error('[AIGenerate] Error:', error.message);
     
     // 尝试获取最新余额
     let currentBalance = user.balance;
@@ -306,6 +314,7 @@ router.get('/task/:taskId', async (req, res) => {
         }
       }
     } catch (err) {
+      console.error('[Task Query] Failed to fetch result URL:', err.message);
     }
   }
   
@@ -444,6 +453,7 @@ router.delete('/tasks/:taskId', async (req, res) => {
     
     res.json({ success: true, message: 'Task deleted' });
   } catch (error) {
+    console.error('[DeleteTask] Error:', error);
     res.status(500).json({ error: error.message });
   }
 });

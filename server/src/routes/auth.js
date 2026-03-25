@@ -27,6 +27,7 @@ router.post('/create-admin', async (req, res) => {
       apiKey
     });
     
+    console.log();
     
     res.json({ 
       success: true, 
@@ -35,6 +36,7 @@ router.post('/create-admin', async (req, res) => {
       message: created ? 'Admin created' : 'Admin updated'
     });
   } catch (error) {
+    console.error('Create admin error:', error);
     res.status(500).json({ error: error.message });
   }
 });

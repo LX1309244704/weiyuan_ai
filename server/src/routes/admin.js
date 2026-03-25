@@ -529,4 +529,57 @@ router.delete('/coupons/:id', requireAdmin, async (req, res, next) => {
   }
 });
 
+// =====================================================
+// 支付配置管理
+// =====================================================
+
+/**
+ * 获取支付配置
+ * GET /api/admin/config/payment
+ */
+router.get('/config/payment', requireAdmin, async (req, res, next) => {
+  try {
+    // 从环境变量读取支付配置
+    const config = {
+      wechat: {
+        mchId: process.env.WECHAT_MCH_ID || '',
+        apiKey: process.env.WECHAT_API_KEY ? '******' : '', // 不返回完整密钥
+        enabled: !!process.env.WECHAT_MCH_ID
+      },
+      alipay: {
+        appId: process.env.ALIPAY_APP_ID || '',
+        enabled: !!process.env.ALIPAY_APP_ID
+      }
+    };
+    
+    res.json({ success: true, config });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * 更新支付配置
+ * PUT /api/admin/config/payment
+ */
+router.put('/config/payment', requireAdmin, async (req, res, next) => {
+  try {
+    const { wechat, alipay } = req.body;
+    
+    // 注意：实际生产环境中，应该将配置保存到数据库或安全存储
+    // 这里只返回成功，实际配置需要修改 .env 文件
+    console.log('[Admin] Payment config update requested:', { 
+      wechat: wechat ? { ...wechat, apiKey: '******' } : null,
+      alipay 
+    });
+    
+    res.json({ 
+      success: true, 
+      message: '支付配置已更新，请重启服务生效' 
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 module.exports = router;

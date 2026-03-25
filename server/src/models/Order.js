@@ -28,6 +28,11 @@ module.exports = (sequelize, DataTypes) => {
         key: 'id'
       }
     },
+    endpointId: {
+      type: DataTypes.UUID,
+      allowNull: true,
+      comment: '关联的API端点ID'
+    },
     amount: {
       type: DataTypes.INTEGER, // in cents
       allowNull: false

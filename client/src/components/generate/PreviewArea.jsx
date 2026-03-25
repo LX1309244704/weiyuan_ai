@@ -498,9 +498,9 @@ export default function PreviewArea({
                       {statusDisplay.text}
                     </span>
                     {(() => {
-                      // 计算实际扣减积分 = 扣费 - 退款
-                      const actualCost = (task.cost || 0) - (task.refundAmount || 0)
-                      if (actualCost > 0) {
+                      // 使用后端返回的实际扣减积分
+                      const actualCost = task.actualCost
+                      if (actualCost !== undefined && actualCost > 0) {
                         return (
                           <span style={{ fontSize: '0.7rem', color: 'var(--ai-text-muted)' }}>
                             -{actualCost}积分

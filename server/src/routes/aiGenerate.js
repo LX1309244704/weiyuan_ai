@@ -359,7 +359,15 @@ router.get('/tasks', async (req, res) => {
   if (status && status !== 'all') where.status = status;
   
   const { count, rows } = await AiGenerateTask.findAndCountAll({ where, order: [['created_at', 'DESC']], limit, offset });
-  res.json({ success: true, total: count, tasks: rows });
+  
+  // 计算实际扣减积分
+  const tasks = rows.map(task => {
+    const t = task.toJSON();
+    t.actualCost = (t.cost || 0) - (t.refundAmount || 0);
+    return t;
+  });
+  
+  res.json({ success: true, total: count, tasks });
 });
 
 /**

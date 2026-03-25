@@ -24,11 +24,16 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      const authRoutes = ['/auth/me', '/auth/login', '/auth/register']
-      const requestUrl = error.config?.url || ''
+      // 清除认证状态
+      useAuthStore.getState().logout()
       
-      if (authRoutes.some(route => requestUrl.includes(route))) {
-        useAuthStore.getState().logout()
+      // 重定向到登录页面
+      if (typeof window !== 'undefined') {
+        // 保存当前路径，登录后跳回
+        const currentPath = window.location.pathname
+        if (currentPath !== '/login' && currentPath !== '/register') {
+          window.location.href = `/login?redirect=${encodeURIComponent(currentPath)}`
+        }
       }
     }
     return Promise.reject(error)

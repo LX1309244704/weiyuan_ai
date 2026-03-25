@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import { Mail, Lock, ArrowRight, AlertCircle } from 'lucide-react'
 import { useAuthStore } from '../context/AuthContext'
 import TopNavigationBar from '../components/TopNavigationBar'
@@ -13,6 +13,8 @@ function LoginNew() {
   const [focused, setFocused] = useState('')
   
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const location = useLocation()
   const login = useAuthStore((state) => state.login)
   
   const handleSubmit = async (e) => {
@@ -22,7 +24,9 @@ function LoginNew() {
     
     try {
       await login(email, password)
-      navigate('/')
+      // 登录成功后跳转到之前尝试访问的页面，或首页
+      const redirect = searchParams.get('redirect') || location.state?.from || '/'
+      navigate(redirect)
     } catch (err) {
       setError(err.response?.data?.error || '登录失败')
     } finally {

@@ -81,14 +81,18 @@ CREATE TABLE `ai_models` (
 -- =====================================================
 CREATE TABLE `orders` (
   `id` CHAR(36) NOT NULL PRIMARY KEY COMMENT '订单ID(UUID)',
+  `order_no` VARCHAR(64) NOT NULL COMMENT '订单号',
   `user_id` CHAR(36) NOT NULL COMMENT '用户ID',
+  `skill_id` CHAR(36) COMMENT '技能ID',
   `amount` INT NOT NULL COMMENT '订单金额(分)',
-  `package_size` INT DEFAULT 0 COMMENT '购买积分数量',
-  `payment_method` VARCHAR(50) COMMENT '支付方式',
-  `status` ENUM('pending','paid','failed','refunded') DEFAULT 'pending' COMMENT '订单状态',
+  `package_size` INT NOT NULL COMMENT '购买积分数量',
+  `payment_method` ENUM('wechat','alipay') NOT NULL COMMENT '支付方式',
+  `transaction_id` VARCHAR(128) COMMENT '交易流水号',
+  `status` ENUM('pending','paid','refunded','cancelled') DEFAULT 'pending' COMMENT '订单状态',
   `paid_at` DATETIME COMMENT '支付时间',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  UNIQUE KEY `uk_order_no` (`order_no`),
   KEY `idx_user_id` (`user_id`),
   KEY `idx_status` (`status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='订单表';
@@ -100,7 +104,7 @@ CREATE TABLE `balance_logs` (
   `id` CHAR(36) NOT NULL PRIMARY KEY COMMENT '记录ID(UUID)',
   `user_id` CHAR(36) NOT NULL COMMENT '用户ID',
   `change` INT NOT NULL COMMENT '变动金额(分)',
-  `reason` VARCHAR(255) NOT NULL COMMENT '变动原因',
+  `reason` VARCHAR(100) NOT NULL COMMENT '变动原因',
   `balance_after` INT NOT NULL COMMENT '变动后余额(分)',
   `type` ENUM('consume','recharge','refund','adjust') NOT NULL COMMENT '变动类型',
   `related_id` CHAR(36) COMMENT '关联业务ID',

@@ -64,13 +64,7 @@ let pollingWorker = null;
 // Serve frontend static files
 app.use(express.static(path.join(__dirname, '../public')));
 
-// SPA fallback
-app.use((req, res, next) => {
-  if (req.path.startsWith('/api/')) return next();
-  res.sendFile(path.join(__dirname, '../public/index.html'));
-});
-
-// Error handling
+// Error handling (must be before SPA fallback)
 app.use((err, req, res, next) => {
   console.error('Error:', err);
   if (err.name === 'SequelizeValidationError') {
@@ -82,9 +76,14 @@ app.use((err, req, res, next) => {
   res.status(err.statusCode || 500).json({ error: err.message || 'Internal server error' });
 });
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ error: 'Not found' });
+// SPA fallback - 所有非 API 路由返回 index.html（让 React Router 处理）
+app.get('*', (req, res, next) => {
+  // API 路由返回 404
+  if (req.path.startsWith('/api/')) {
+    return res.status(404).json({ error: 'Not found' });
+  }
+  // 其他路由返回 index.html（SPA 路由）
+  res.sendFile(path.join(__dirname, '../public/index.html'));
 });
 
 // Initialize user balances in Redis

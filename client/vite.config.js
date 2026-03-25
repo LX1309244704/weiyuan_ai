@@ -4,7 +4,7 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
-  base: './',  // 相对路径部署
+  base: '/',  // 绝对路径，避免二级路由资源加载问题
   build: {
     outDir: path.resolve(__dirname, '../server/public'),
     emptyOutDir: true

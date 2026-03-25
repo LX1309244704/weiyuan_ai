@@ -5,8 +5,6 @@
  * @returns {Promise<string>} - 返回上传后的 URL
  */
 export async function uploadToRunningHub(file, apiKey) {
-  console.log('[Upload] Starting upload, file:', file.name, 'size:', file.size)
-  
   const formData = new FormData()
   formData.append('file', file)
   
@@ -18,16 +16,12 @@ export async function uploadToRunningHub(file, apiKey) {
     body: formData
   })
   
-  console.log('[Upload] Response status:', response.status)
-  
   if (!response.ok) {
     const errorText = await response.text()
-    console.error('[Upload] Error response:', errorText)
     throw new Error(`Upload failed: ${response.status} - ${errorText}`)
   }
   
   const result = await response.json()
-  console.log('[Upload] Response result:', JSON.stringify(result))
   
   if (result.results && result.results[0]?.url) {
     return result.results[0].url

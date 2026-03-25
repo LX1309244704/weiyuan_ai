@@ -97,7 +97,6 @@ export default function PreviewArea({
       if (!mounted) return
       if (sseRef.current && sseRef.current.readyState !== EventSource.CLOSED) return
 
-      console.log('Connecting SSE...')
       if (sseRef.current) {
         sseRef.current.close()
         sseRef.current = null
@@ -112,13 +111,12 @@ export default function PreviewArea({
           const data = JSON.parse(event.data)
           handleSSEUpdate(data)
         } catch (err) {
-          console.error('SSE parse error:', err)
+          // SSE parse error
         }
       }
 
       eventSource.onerror = () => {
         if (!mounted) return
-        console.log('SSE disconnected')
         eventSource.close()
         sseRef.current = null
         // 断线重连，延迟3秒
@@ -128,16 +126,11 @@ export default function PreviewArea({
           if (mounted) connectSSE()
         }, 3000)
       }
-
-      eventSource.onopen = () => {
-        console.log('SSE connected')
-      }
     }
 
     // 监听强制重连事件
     const handleForceReconnect = () => {
       if (!mounted) return
-      console.log('Force reconnecting SSE...')
       if (sseRef.current) {
         sseRef.current.close()
         sseRef.current = null
@@ -173,9 +166,7 @@ export default function PreviewArea({
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        console.log('Page visible, checking SSE...')
         if (!sseRef.current || sseRef.current.readyState === EventSource.CLOSED) {
-          console.log('SSE not connected, reconnecting...')
           if (sseTimerRef.current) clearTimeout(sseTimerRef.current)
           sseTimerRef.current = setTimeout(() => {
             sseTimerRef.current = null

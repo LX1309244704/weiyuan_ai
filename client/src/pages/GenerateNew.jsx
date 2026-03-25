@@ -83,7 +83,6 @@ export default function GenerateNew() {
     const fetchApiEndpoints = async () => {
     try {
       const response = await api.get('/ai-generate/models')
-      console.log('AI Generate models:', response.data)
       const modelsList = response.data.models || []
       
       if (modelsList.length > 0) {
@@ -224,30 +223,19 @@ export default function GenerateNew() {
       // 上传本地参考图片到 RunningHub
       let imageUrls = []
       
-      console.log('========== DEBUG UPLOAD ==========')
-      console.log('currentImages:', currentImages)
-      console.log('selectedModel.apiKey:', selectedModel?.apiKey)
-      console.log('selectedModel:', selectedModel?.name, selectedModel?.id)
-      console.log('====================================')
-      
       // 检查图片是否已经上传（是 HTTPS URL 则是已上传）
       for (const img of currentImages) {
         if (img && img.url) {
           // 如果已经是远程 URL，直接使用
           if (img.url.startsWith('http://') || img.url.startsWith('https://')) {
-            console.log('Image already uploaded:', img.id, img.url)
             imageUrls.push(img.url)
           } else if (img.url.startsWith('data:')) {
             // base64 图片，需要上传
             try {
-              console.log('Converting and uploading image:', img.id)
               const file = base64ToFile(img.url, `reference_${img.id}.png`)
-              console.log('File created, calling upload API...')
               const uploadedUrl = await uploadToRunningHub(file, selectedModel.apiKey)
-              console.log('Uploaded URL:', uploadedUrl)
               imageUrls.push(uploadedUrl)
             } catch (uploadErr) {
-              console.error('Upload failed, using original:', uploadErr)
               imageUrls.push(img.url)
             }
           }

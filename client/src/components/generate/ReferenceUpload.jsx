@@ -13,7 +13,6 @@ const uploadImageToServer = async (file) => {
     headers: { 'Content-Type': 'multipart/form-data' }
   })
   
-  console.log('Upload response:', response.data)
   return response.data.url
 }
 
@@ -36,9 +35,7 @@ export default function ReferenceUpload({ images = [], onChange }) {
     // 后台上传每个图片
     for (const img of tempImages) {
       try {
-        console.log('Uploading image:', img.id)
         const uploadedUrl = await uploadImageToServer(img.file)
-        console.log('Uploaded URL:', uploadedUrl)
         
         // 释放临时 URL 并更新为真实 URL
         URL.revokeObjectURL(img.url)
@@ -46,7 +43,6 @@ export default function ReferenceUpload({ images = [], onChange }) {
           p.id === img.id ? { ...p, url: uploadedUrl, file: null } : p
         ))
       } catch (err) {
-        console.error('Upload failed:', err)
         // 保留本地预览
         onChange?.(prev => prev.map(p => 
           p.id === img.id ? { ...p, file: null } : p

@@ -269,20 +269,27 @@ export default function GenerateNew() {
           const taskStatus = data.status || 'queued'
           const resultUrl = data.resultUrl || data.result?.[0] || null
           // 更新本地任务 - 使用 taskTimestamp 匹配
-          setTasks(prev => prev.map(t => 
-            t.taskTimestamp === taskTimestamp 
-              ? { ...t, taskId: data.taskId, realTaskId: data.taskId, status: resultUrl ? 'completed' : taskStatus, progress: resultUrl ? 100 : 0, resultUrl }
-              : t
-          ))
+          setTasks(prev => {
+            const updated = prev.map(t => 
+              t.taskTimestamp === taskTimestamp 
+                ? { ...t, taskId: data.taskId, realTaskId: data.taskId, status: resultUrl ? 'completed' : taskStatus, progress: resultUrl ? 100 : 0, resultUrl }
+                : t
+            )
+            // 如果任务已完成，从本地列表中移除（PreviewArea 会管理历史任务）
+            return updated.filter(t => t.status !== 'completed')
+          })
           if (data.balance !== undefined) {
             setBalance(data.balance)
           }
         } else if (data.data) {
-          setTasks(prev => prev.map(t => 
-            t.taskId === newTask.taskId 
-              ? { ...t, status: 'completed', progress: 100, resultUrl: data.data }
-              : t
-          ))
+          setTasks(prev => {
+            const updated = prev.map(t => 
+              t.taskId === newTask.taskId 
+                ? { ...t, status: 'completed', progress: 100, resultUrl: data.data }
+                : t
+            )
+            return updated.filter(t => t.status !== 'completed')
+          })
         } else {
           setTasks(prev => prev.map(t => 
             t.taskId === newTask.taskId 

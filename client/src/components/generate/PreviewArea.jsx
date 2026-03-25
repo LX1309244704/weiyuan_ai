@@ -205,9 +205,15 @@ export default function PreviewArea({
 
       return prev.map((t, idx) => {
         if (idx !== taskIndex) return t
+        
+        // 保护已完成任务不被错误更新
+        if (t.status === 'completed' && data.status !== 'completed') {
+          return t  // 保持已完成状态不变
+        }
+        
         return {
           ...t,
-          status: data.status,
+          status: data.status ?? t.status,
           progress: data.progress ?? t.progress,
           resultUrl: data.resultUrl || t.resultUrl,
           errorMessage: data.errorMessage || data.message || t.errorMessage
@@ -226,8 +232,20 @@ export default function PreviewArea({
       externalTasks.forEach(extTask => {
         const index = newTasks.findIndex(t => t.taskId === extTask.taskId || t.realTaskId === extTask.taskId)
         if (index !== -1) {
-          // 更新已存在的任务
-          newTasks[index] = { ...newTasks[index], ...extTask }
+          // 更新已存在的任务，但保护已完成状态不被覆盖
+          const existingTask = newTasks[index]
+          // 如果已有任务是已完成状态，且新任务状态不是完成，则不更新状态
+          if (existingTask.status === 'completed' && extTask.status !== 'completed') {
+            // 只更新其他字段，不更新状态
+            newTasks[index] = { 
+              ...existingTask, 
+              ...extTask,
+              status: 'completed',  // 保持已完成状态
+              resultUrl: existingTask.resultUrl  // 保持结果URL
+            }
+          } else {
+            newTasks[index] = { ...existingTask, ...extTask }
+          }
         } else {
           // 只添加真实任务，不添加占位任务
           if (!extTask.taskId.startsWith('pending_')) {

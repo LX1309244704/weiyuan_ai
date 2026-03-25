@@ -50,7 +50,6 @@ const redisPool = {
 for (let i = 0; i < 5; i++) {
   redisPool.connections.push(createRedisPool());
 }
-console.log(`Redis connection pool initialized with ${redisPool.connections.length} connections`);
 
 // Redis keys pattern
 const KEYS = {
@@ -80,11 +79,9 @@ const TTL = {
 
 // Event handlers
 redis.on('connect', () => {
-  console.log('Redis connected successfully');
 });
 
 redis.on('error', (err) => {
-  console.error('Redis error:', err.message);
 });
 
 module.exports = {

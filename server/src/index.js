@@ -66,7 +66,6 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 // Error handling (must be before SPA fallback)
 app.use((err, req, res, next) => {
-  console.error('Error:', err);
   if (err.name === 'SequelizeValidationError') {
     return res.status(400).json({ error: 'Validation error', details: err.errors.map(e => e.message) });
   }
@@ -96,9 +95,7 @@ async function initializeBalanceCache() {
       pipeline.set(`balance:${user.id}`, user.balance, 'EX', 86400);
     }
     await pipeline.exec();
-    console.log(`Cached ${users.length} user balances`);
   } catch (error) {
-    console.error('Failed to initialize balance cache:', error.message);
   }
 }
 
@@ -124,7 +121,6 @@ async function createDefaultAccounts() {
         balance: 10000,
         apiKey: uuidv4().replace(/-/g, '')
       });
-      console.log(`Admin created: ${adminEmail}`);
     }
 
     // Test account
@@ -141,10 +137,8 @@ async function createDefaultAccounts() {
         balance: 5000,
         apiKey: uuidv4().replace(/-/g, '')
       });
-      console.log(`Test user created: ${testEmail}`);
     }
   } catch (error) {
-    console.error('Failed to create accounts:', error.message);
   }
 }
 
@@ -152,17 +146,14 @@ async function createDefaultAccounts() {
 async function startServer() {
   try {
     await sequelize.authenticate();
-    console.log('Database connected.');
 
     // 使用 { force: false } 避免自动创建表，依赖 init.sql 创建表结构
     // 如果需要更新表结构，请手动执行 init.sql
     await sequelize.sync({ force: false, alter: false });
-    console.log('Models synchronized.');
 
     await createDefaultAccounts();
 
     await redis.ping();
-    console.log('Redis connected.');
 
     await initializeBalanceCache();
 
@@ -171,14 +162,12 @@ async function startServer() {
     const workerConcurrency = parseInt(process.env.WORKER_CONCURRENCY) || 3;
     const workerCount = parseInt(process.env.WORKER_COUNT) || 2;
     
-    console.log(`Starting ${workerCount} Worker(s), each with ${workerConcurrency} concurrency`);
     
     // 创建多个 Worker 实例
     const workers = [];
     for (let i = 0; i < workerCount; i++) {
       const worker = createPollingWorker(workerConcurrency);
       workers.push(worker);
-      console.log(`Worker ${i + 1}/${workerCount} started`);
     }
     
     // 保存第一个 Worker 作为主引用（用于关闭等操作）
@@ -190,17 +179,14 @@ async function startServer() {
     }, 3000);
 
     app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
     });
   } catch (error) {
-    console.error('Failed to start server:', error);
     process.exit(1);
   }
 }
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-  console.log('Shutting down...');
   if (pollingWorker) {
     await pollingWorker.close();
   }
@@ -210,7 +196,6 @@ process.on('SIGTERM', async () => {
 });
 
 process.on('SIGINT', async () => {
-  console.log('Shutting down...');
   if (pollingWorker) {
     await pollingWorker.close();
   }

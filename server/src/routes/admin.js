@@ -568,7 +568,6 @@ router.put('/config/payment', requireAdmin, async (req, res, next) => {
     
     // 注意：实际生产环境中，应该将配置保存到数据库或安全存储
     // 这里只返回成功，实际配置需要修改 .env 文件
-    console.log('[Admin] Payment config update requested:', { 
       wechat: wechat ? { ...wechat, apiKey: '******' } : null,
       alipay 
     });

@@ -128,7 +128,6 @@ router.post('/redeem', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[Coupon] Redeem error:', error);
     res.status(500).json({
       success: false,
       error: error.message
@@ -192,7 +191,6 @@ router.post('/create', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('[Coupon] Create error:', error);
     res.status(500).json({
       success: false,
       error: error.message

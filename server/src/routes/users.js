@@ -131,7 +131,6 @@ router.get('/invocations', authenticate, async (req, res, next) => {
       }
     });
   } catch (error) {
-    console.error('[Invocations] Error:', error.message);
     res.json({ records: [], pagination: { total: 0, page: 1, limit: 20, pages: 0 } });
   }
 });
@@ -167,7 +166,6 @@ router.get('/api-invocations', authenticate, async (req, res, next) => {
       }
     });
   } catch (error) {
-    console.error('[ApiInvocations] Error:', error.message);
     res.json({ records: [], pagination: { total: 0, page: 1, limit: 20, pages: 0 } });
   }
 });
@@ -199,7 +197,6 @@ router.get('/orders', authenticate, async (req, res, next) => {
       }
     });
   } catch (error) {
-    console.error('[Orders] Error:', error.message);
     res.json({ orders: [], pagination: { total: 0, page: 1, limit: 20, pages: 0 } });
   }
 });

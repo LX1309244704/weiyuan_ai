@@ -329,9 +329,7 @@ router.post('/generate', async (req, res, next) => {
         await User.decrement('balance', { by: cost, where: { id: user.id } });
         await tool.increment('usageCount');
         
-        console.log(`[GENERATE] ${tool.type} ${tool.name} [${response.status}] ${latency}ms cost=${cost}`);
       } catch (err) {
-        console.error('[GENERATE] Failed to save invocation:', err.message);
       }
     });
 
@@ -347,7 +345,6 @@ router.post('/generate', async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('[GENERATE] Error:', error);
     res.status(500).json({
       success: false,
       error: 'Internal server error',

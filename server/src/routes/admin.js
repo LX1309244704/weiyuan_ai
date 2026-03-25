@@ -72,6 +72,36 @@ router.get('/stats', requireAdmin, async (req, res, next) => {
   }
 });
 
+/**
+ * 获取收入统计
+ * GET /api/admin/stats/revenue
+ */
+router.get('/stats/revenue', requireAdmin, async (req, res, next) => {
+  try {
+    const { startDate, endDate } = req.query;
+    
+    const where = { status: 'paid' };
+    if (startDate && endDate) {
+      where.created_at = {
+        [Op.between]: [new Date(startDate), new Date(endDate)]
+      };
+    }
+    
+    const totalRevenue = await Order.sum('amount', { where }) || 0;
+    const orderCount = await Order.count({ where });
+    
+    res.json({
+      success: true,
+      revenue: {
+        total: totalRevenue,
+        orderCount
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // =====================================================
 // 用户管理
 // =====================================================
@@ -321,6 +351,42 @@ router.get('/orders', requireAdmin, async (req, res, next) => {
       success: true,
       orders: rows,
       pagination: { total: count, page: parseInt(page), pageSize: limit, pages: Math.ceil(count / limit) }
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// =====================================================
+// API 调用记录管理
+// =====================================================
+
+/**
+ * 获取 API 调用记录列表
+ * GET /api/admin/invocations
+ */
+router.get('/invocations', requireAdmin, async (req, res, next) => {
+  try {
+    const { page = 1, limit = 20, status } = req.query;
+    const limitNum = parseInt(limit);
+    const offset = (parseInt(page) - 1) * limitNum;
+    
+    const where = {};
+    if (status && status !== 'all') {
+      where.status = status;
+    }
+    
+    const { count, rows } = await ApiInvocation.findAndCountAll({
+      where,
+      order: [['created_at', 'DESC']],
+      limit: limitNum,
+      offset
+    });
+    
+    res.json({
+      success: true,
+      invocations: rows,
+      pagination: { total: count, page: parseInt(page), limit: limitNum, pages: Math.ceil(count / limitNum) }
     });
   } catch (error) {
     next(error);

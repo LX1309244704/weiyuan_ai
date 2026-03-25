@@ -156,8 +156,8 @@ function createPollingWorker(concurrency = WORKER_CONCURRENCY) {
       return;
     }
     
-    // 轮询任务状态
-    const maxAttempts = 120;
+    // 轮询任务状态（30分钟超时：360次 × 5秒 = 1800秒）
+    const maxAttempts = parseInt(process.env.TASK_TIMEOUT_ATTEMPTS) || 360;
     let attempts = 0;
     
     while (attempts < maxAttempts) {

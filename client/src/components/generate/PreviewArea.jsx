@@ -497,11 +497,25 @@ export default function PreviewArea({
                       {statusDisplay.icon}
                       {statusDisplay.text}
                     </span>
-                    {task.cost > 0 && (
-                      <span style={{ fontSize: '0.7rem', color: 'var(--ai-text-muted)' }}>
-                        -{task.cost}积分
-                      </span>
-                    )}
+                    {(() => {
+                      // 计算实际扣减积分 = 扣费 - 退款
+                      const actualCost = (task.cost || 0) - (task.refundAmount || 0)
+                      if (actualCost > 0) {
+                        return (
+                          <span style={{ fontSize: '0.7rem', color: 'var(--ai-text-muted)' }}>
+                            -{actualCost}积分
+                          </span>
+                        )
+                      } else if (actualCost === 0 && task.cost > 0) {
+                        // 已全额退款
+                        return (
+                          <span style={{ fontSize: '0.7rem', color: '#22c55e' }}>
+                            已退款
+                          </span>
+                        )
+                      }
+                      return null
+                    })()}
                     <span style={{ fontSize: '0.65rem', color: 'var(--ai-text-muted)', marginLeft: '0.25rem' }}>
                       {getModelDisplayName(task.modelName)}
                     </span>

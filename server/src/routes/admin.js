@@ -96,7 +96,7 @@ router.get('/users', requireAdmin, async (req, res, next) => {
     
     const { count, rows } = await User.findAndCountAll({
       where,
-      attributes: ['id', 'username', 'email', 'balance', 'role', 'isActive', 'createdAt'],
+      attributes: ['id', 'username', 'email', 'balance', 'role', 'isActive', 'created_at'],
       order: [['created_at', 'DESC']],
       limit,
       offset

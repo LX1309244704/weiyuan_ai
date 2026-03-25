@@ -41,8 +41,21 @@ export async function uploadToRunningHub(file, apiKey) {
  * @returns {File}
  */
 export function base64ToFile(base64, filename = 'image.png') {
+  if (!base64 || typeof base64 !== 'string') {
+    throw new Error('Invalid base64 data')
+  }
+  
   const arr = base64.split(',')
-  const mime = arr[0].match(/:(.*?);/)[1]
+  if (arr.length < 2) {
+    throw new Error('Invalid base64 format')
+  }
+  
+  const mimeMatch = arr[0].match(/:(.*?);/)
+  if (!mimeMatch || !mimeMatch[1]) {
+    throw new Error('Invalid base64 mime type')
+  }
+  
+  const mime = mimeMatch[1]
   const bstr = atob(arr[1])
   let n = bstr.length
   const u8arr = new Uint8Array(n)

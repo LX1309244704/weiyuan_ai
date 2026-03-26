@@ -100,11 +100,13 @@ export default function GenerateNew() {
           apiKey: m.apiKey || ''  // 模型对应的 API Key
         }))
         setModels(formattedModels)
-        setSelectedModel(formattedModels[0])
-        setParams(formattedModels[0].defaultParams || {})
+        
+        // 默认选择香蕉Flash，如果没有则选第一个
+        const defaultModel = formattedModels.find(m => m.id === 'runninghub/bananaflash') || formattedModels[0]
+        setSelectedModel(defaultModel)
+        setParams(defaultModel.defaultParams || {})
       }
     } catch (err) {
-      console.error('Failed to fetch AI Generate models:', err)
       setModels([])
     }
   }

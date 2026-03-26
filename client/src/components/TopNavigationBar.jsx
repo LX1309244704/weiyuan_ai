@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuthStore } from '../context/AuthContext'
-import { User, Sparkles, Plug, FileText, UserCircle2, LogOut, Settings, Coins, DollarSign } from 'lucide-react'
+import { User, Sparkles, FileText, UserCircle2, LogOut, Settings, DollarSign } from 'lucide-react'
 import '../styles/generate.css'
 
 export default function TopNavigationBar({ title = "Weiyuan AI" }) {
@@ -19,7 +19,6 @@ export default function TopNavigationBar({ title = "Weiyuan AI" }) {
   const menuItems = [
     { label: 'AI创作', path: '/', icon: Sparkles, highlightPaths: ['/', '/generate'] },
     { label: '生成记录', path: '/generate/history', icon: FileText, highlightPaths: ['/generate/history'] },
-    { label: 'API', path: '/api-market', icon: Plug, highlightPaths: ['/api-market'] },
     { label: '个人中心', path: '/profile', icon: UserCircle2, highlightPaths: ['/profile', '/recharge'] }
   ]
 

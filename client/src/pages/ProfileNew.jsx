@@ -285,26 +285,6 @@ function ProfileNew() {
                 }}>
                   {user?.balance || 0}
                 </p>
-                <button 
-                  onClick={() => navigate('/recharge')}
-                  style={{ 
-                    fontSize: '0.75rem', 
-                    padding: '0.375rem 0.75rem',
-                    marginTop: '0.5rem',
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.25rem',
-                    background: 'var(--ai-accent-green)',
-                    border: 'none',
-                    borderRadius: '6px',
-                    color: '#000',
-                    fontWeight: 600,
-                    cursor: 'pointer'
-                  }}
-                >
-                  <Plus size={14} />
-                  充值
-                </button>
               </div>
             </div>
             

@@ -10,6 +10,20 @@ const { addTaskToQueue } = require('../config/queue');
 // 初始化加载所有运营商处理器
 providerManager.loadAll();
 
+// 模型 ID 到显示名称的映射
+const MODEL_DISPLAY_NAMES = {
+  'runninghub/bananaflash': '香蕉Flash',
+  'runninghub/nanobanana': '香蕉Pro',
+  'runninghub/veo31': 'VEO3.1视频',
+  'runninghub/sora2': 'Sora2视频',
+  'huoshan/image': '火山图片'
+};
+
+// 获取模型显示名称
+function getModelDisplayName(modelId) {
+  return MODEL_DISPLAY_NAMES[modelId] || modelId?.split('/')?.pop() || modelId || 'AI生成';
+}
+
 // SSE 客户端管理 - 从 queue.js 导入共享的 sseClients
 const { sseClients, sendTaskUpdate } = require('../config/queue');
 
@@ -232,7 +246,7 @@ router.post('/*', async (req, res) => {
       await BalanceLog.create({ 
         userId: user.id, 
         change: -cost, 
-        reason: `AI生成 (${pathPrefix})`, 
+        reason: `${getModelDisplayName(pathPrefix)}生成`, 
         balanceAfter: newBalance, 
         type: 'consume', 
         relatedId: task.id 

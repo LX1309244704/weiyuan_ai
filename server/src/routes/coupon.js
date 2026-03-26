@@ -32,18 +32,6 @@ async function authenticateUser(req) {
 router.post('/redeem', async (req, res) => {
   const { code } = req.body;
   
-  let apiKey = req.headers['x-api-key'] || req.headers['authorization'];
-  if (apiKey && apiKey.startsWith('Bearer ')) {
-    apiKey = apiKey.substring(7);
-  }
-  
-  if (!apiKey) {
-    return res.status(401).json({
-      success: false,
-      error: 'API Key is required'
-    });
-  }
-  
   if (!code) {
     return res.status(400).json({
       success: false,
@@ -51,11 +39,24 @@ router.post('/redeem', async (req, res) => {
     });
   }
   
-  const user = await User.findOne({ where: { apiKey } });
+  // 支持 JWT token 或 API Key 验证
+  let user = await authenticateUser(req);
+  
+  // 如果没有认证信息，尝试从 Authorization header 直接读取 API Key（兼容旧版客户端）
+  if (!user) {
+    let apiKey = req.headers['x-api-key'] || req.headers['authorization'];
+    if (apiKey && apiKey.startsWith('Bearer ')) {
+      apiKey = apiKey.substring(7);
+    }
+    if (apiKey) {
+      user = await User.findOne({ where: { apiKey } });
+    }
+  }
+  
   if (!user) {
     return res.status(401).json({
       success: false,
-      error: '无效的API Key'
+      error: '请先登录后再兑换'
     });
   }
   

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Key, Wallet, ShoppingCart, Zap, Copy, RefreshCw, TrendingUp, TrendingDown, Clock, CheckCircle, XCircle, Plus, ArrowLeft, Gift } from 'lucide-react'
+import { Wallet, ShoppingCart, Zap, TrendingUp, TrendingDown, Clock, CheckCircle, XCircle, ArrowLeft, Gift } from 'lucide-react'
 import { useAuthStore } from '../context/AuthContext'
 import api from '../utils/api'
 import dayjs from 'dayjs'
@@ -45,7 +45,6 @@ function ProfileNew() {
   const [orders, setOrders] = useState([])
   const [invocations, setInvocations] = useState([])
   const [loading, setLoading] = useState(false)
-  const [resettingKey, setResettingKey] = useState(false)
   const [couponCode, setCouponCode] = useState('')
   const [redeeming, setRedeeming] = useState(false)
   const [pageSize, setPageSize] = useState(10)
@@ -124,11 +123,6 @@ function ProfileNew() {
     }
   }
   
-  const copyToClipboard = (text) => {
-    navigator.clipboard.writeText(text)
-    alert('已复制到剪贴板')
-  }
-  
   const handleRedeemCoupon = async () => {
     if (!couponCode.trim()) {
       alert('请输入兑换码')
@@ -163,7 +157,7 @@ function ProfileNew() {
   if (!isAuthenticated) return null
   
   const tabs = [
-    { key: 'api-key', label: 'API Key', icon: Key },
+    // { key: 'api-key', label: 'API Key', icon: Key }, // 已隐藏
     { key: 'balance', label: '余额明细', icon: Wallet },
     { key: 'orders', label: '订单记录', icon: ShoppingCart },
     { key: 'usage', label: '调用记录', icon: Zap }
@@ -374,6 +368,7 @@ function ProfileNew() {
             borderRadius: '12px',
             padding: '2rem'
           }}>
+            {/* API Key 已隐藏
             {activeTab === 'api-key' && (
               <div>
                 <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '1rem', color: 'var(--ai-text-primary)' }}>
@@ -443,6 +438,7 @@ function ProfileNew() {
                 </button>
               </div>
             )}
+            */}
             
             {activeTab === 'balance' && (
               <div>

@@ -252,7 +252,7 @@ class RunningHubProvider extends BaseProvider {
   }
 
   buildRequest(params) {
-    const { prompt, imageUrls, firstFrameUrl, lastFrameUrl, resolution, aspectRatio, duration, mode, ...extra } = params;
+    const { prompt, imageUrls, firstFrameUrl, lastFrameUrl, resolution, aspectRatio, duration, mode, modelType, ...extra } = params;
     
     let body = { prompt: prompt || '' };
 

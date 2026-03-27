@@ -258,23 +258,26 @@ class RunningHubProvider extends BaseProvider {
 
     // 根据模型类型构建不同的请求体
     if (this.modelId === 'runninghub/veo31') {
-      // VEO3.1视频生成
-      const videoMode = mode || 't2v';
+      // VEO3.1视频生成 - 根据图片数量自动判断模式
+      // 2张及以上图片 -> 首尾帧模式 (se2v)
+      // 1张图片 -> 图生视频模式 (i2v)
+      // 无图片 -> 文生视频模式 (t2v)
+      let videoMode = 't2v';
       
-      if (videoMode === 'se2v') {
+      if (imageUrls && imageUrls.length >= 2) {
         // 首尾帧生视频
-        if (firstFrameUrl) body.firstFrameUrl = firstFrameUrl;
-        if (lastFrameUrl) body.lastFrameUrl = lastFrameUrl;
-        if (imageUrls && imageUrls.length > 0) {
-          body.firstFrameUrl = imageUrls[0];
-          if (imageUrls.length > 1) body.lastFrameUrl = imageUrls[1];
-        }
-      } else if (videoMode === 'i2v') {
+        videoMode = 'se2v';
+        body.firstFrameUrl = imageUrls[0];
+        body.lastFrameUrl = imageUrls[1];
+      } else if (imageUrls && imageUrls.length === 1) {
         // 图生视频
-        if (imageUrls && imageUrls.length > 0) body.imageUrls = imageUrls;
+        videoMode = 'i2v';
+        body.imageUrls = imageUrls;
       }
       // 文生视频(t2v)不需要额外图片参数
       
+      // 保存mode到body，供getRequestUrl使用
+      body.mode = videoMode;
       body.aspectRatio = aspectRatio || '16:9';
       body.duration = duration || '8';
       body.resolution = resolution || '720p';

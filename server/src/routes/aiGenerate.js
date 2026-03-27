@@ -36,7 +36,7 @@ router.get('/models', async (req, res) => {
   try {
     const providers = await AiModel.findAll({
       where: { isActive: true },
-      attributes: ['provider', 'name', 'apiKey']
+      attributes: ['provider', 'name', 'apiKey', 'modelPrices']
     });
     
     const models = [];

@@ -258,21 +258,25 @@ class RunningHubProvider extends BaseProvider {
 
     // 根据模型类型构建不同的请求体
     if (this.modelId === 'runninghub/veo31') {
-      // VEO3.1视频生成 - 根据图片数量自动判断模式
-      // 2张及以上图片 -> 首尾帧模式 (se2v)
-      // 1张图片 -> 图生视频模式 (i2v)
-      // 无图片 -> 文生视频模式 (t2v)
-      let videoMode = 't2v';
+      // VEO3.1视频生成 - 根据用户选择的mode参数处理
+      // mode参数由前端传递：t2v(文生视频)、se2v(首尾帧)、i2v(参考生成/图生视频)
+      const videoMode = mode || 't2v';
       
-      if (imageUrls && imageUrls.length >= 2) {
-        // 首尾帧生视频
-        videoMode = 'se2v';
-        body.firstFrameUrl = imageUrls[0];
-        body.lastFrameUrl = imageUrls[1];
-      } else if (imageUrls && imageUrls.length === 1) {
-        // 图生视频
-        videoMode = 'i2v';
-        body.imageUrls = imageUrls;
+      if (videoMode === 'se2v') {
+        // 首尾帧生视频 - 需要2张图片
+        if (imageUrls && imageUrls.length >= 2) {
+          body.firstFrameUrl = imageUrls[0];
+          body.lastFrameUrl = imageUrls[1];
+        } else if (imageUrls && imageUrls.length === 1) {
+          // 只有1张图时，首帧和尾帧用同一张
+          body.firstFrameUrl = imageUrls[0];
+          body.lastFrameUrl = imageUrls[0];
+        }
+      } else if (videoMode === 'i2v') {
+        // 图生视频/参考生成 - 支持1-3张图片
+        if (imageUrls && imageUrls.length > 0) {
+          body.imageUrls = imageUrls.slice(0, 3); // 最多3张
+        }
       }
       // 文生视频(t2v)不需要额外图片参数
       

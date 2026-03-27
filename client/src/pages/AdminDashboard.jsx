@@ -153,14 +153,14 @@ function AiModelsTab() {
   const getProviderModels = (provider) => {
     const providerModels = {
       runninghub: [
-        { id: 'runninghub/bananaflash', name: '香蕉Flash', defaultPrice: 30 },
-        { id: 'runninghub/nanobanana', name: '香蕉Pro', defaultPrice: 50 },
-        { id: 'runninghub/sora2', name: 'Sora2视频', defaultPrice: 80 },
-        { id: 'runninghub/veo31', name: 'VEO3.1视频', defaultPrice: 100 },
-        { id: 'runninghub/videoX', name: '全能视频X', defaultPrice: 50 }
+        { id: 'runninghub/bananaflash', name: '香蕉Flash', defaultPrice: 30, unit: '次' },
+        { id: 'runninghub/nanobanana', name: '香蕉Pro', defaultPrice: 50, unit: '次' },
+        { id: 'runninghub/sora2', name: 'Sora2视频', defaultPrice: 80, unit: '次' },
+        { id: 'runninghub/veo31', name: 'VEO3.1视频', defaultPrice: 100, unit: '次' },
+        { id: 'runninghub/videoX', name: '全能视频X', defaultPrice: 10, unit: '秒', description: '按秒计费，实际消耗 = 价格 × 视频秒数' }
       ],
       huoshan: [
-        { id: 'huoshan/image', name: '火山图片', defaultPrice: 50 }
+        { id: 'huoshan/image', name: '火山图片', defaultPrice: 50, unit: '次' }
       ]
     }
     return providerModels[provider] || []
@@ -292,14 +292,19 @@ function AiModelsTab() {
         <Modal title={`配置 ${editingModel.name} 模型积分`} onClose={() => setShowPriceModal(false)} maxWidth="600px">
           <div style={{ marginBottom: '1rem' }}>
             <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '1rem' }}>
-              设置每个模型每次调用消耗的积分数量。
+              设置每个模型调用消耗的积分。视频模型按秒计费，图片模型按次计费。
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {getProviderModels(editingModel.provider).map(m => (
-                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', background: '#f8fafc', borderRadius: '8px' }}>
+                <div key={m.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '1rem', padding: '0.75rem', background: '#f8fafc', borderRadius: '8px' }}>
                   <div style={{ flex: 1 }}>
                     <p style={{ fontWeight: 500, fontSize: '0.875rem' }}>{m.name}</p>
                     <p style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{m.id}</p>
+                    {m.description && (
+                      <p style={{ fontSize: '0.7rem', color: '#f59e0b', marginTop: '0.25rem' }}>
+                        {m.description}
+                      </p>
+                    )}
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <input
@@ -310,7 +315,9 @@ function AiModelsTab() {
                       style={{ width: '80px', textAlign: 'center' }}
                       min="0"
                     />
-                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>积分/次</span>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                      积分/{m.unit || '次'}
+                    </span>
                   </div>
                 </div>
               ))}

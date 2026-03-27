@@ -35,6 +35,7 @@ export default function GenerateNew() {
   const [userApiKey, setUserApiKey] = useState('')
   const [balance, setBalance] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)  // 图片上传状态
 
   // 判断当前模型是否支持参考图（纯视频模型不支持）
   const isImageModel = selectedModel?.type === 'image'
@@ -42,6 +43,9 @@ export default function GenerateNew() {
     selectedModel?.id === 'runninghub/sora2' || 
     selectedModel?.id === 'runninghub/videoX' ||
     selectedModel?.id === 'runninghub/veo31'
+    
+  // 检查是否有图片正在上传
+  const hasUploadingImages = referenceImages.some(img => img.uploading)
     
   useEffect(() => {
     fetchApiEndpoints()
@@ -195,6 +199,12 @@ export default function GenerateNew() {
     
     if (!selectedModel?.pathPrefix) {
       alert('请选择模型')
+      return
+    }
+    
+    // 检查是否有图片正在上传
+    if (hasUploadingImages) {
+      alert('请等待图片上传完成')
       return
     }
     
@@ -403,10 +413,10 @@ export default function GenerateNew() {
             <button
               className={`ai-generate-btn ${generating ? 'loading' : ''}`}
               onClick={handleGenerate}
-              disabled={generating || !prompt.trim()}
+              disabled={generating || !prompt.trim() || hasUploadingImages}
               style={{
                 padding: '1rem 2rem',
-                background: generating || !prompt.trim() 
+                background: generating || !prompt.trim() || hasUploadingImages
                   ? 'var(--ai-text-muted)' 
                   : 'linear-gradient(135deg, var(--ai-accent-green), var(--ai-accent-green-hover))',
                 border: 'none',
@@ -414,12 +424,12 @@ export default function GenerateNew() {
                 color: '#000',
                 fontSize: '1rem',
                 fontWeight: 600,
-                cursor: generating || !prompt.trim() ? 'not-allowed' : 'pointer',
+                cursor: generating || !prompt.trim() || hasUploadingImages ? 'not-allowed' : 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '0.5rem',
-                boxShadow: generating || !prompt.trim() 
+                boxShadow: generating || !prompt.trim() || hasUploadingImages 
                   ? 'none' 
                   : '0 4px 12px rgba(74, 222, 128, 0.3)',
                 width: '100%',
@@ -427,7 +437,12 @@ export default function GenerateNew() {
                 margin: '0 auto'
               }}
             >
-              {generating ? (
+              {hasUploadingImages ? (
+                <>
+                  <Loader2 size={20} className="animate-spin" />
+                  等待图片上传...
+                </>
+              ) : generating ? (
                 <>
                   <Loader2 size={20} className="animate-spin" />
                   生成中...

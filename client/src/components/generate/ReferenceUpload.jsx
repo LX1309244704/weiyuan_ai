@@ -1,5 +1,5 @@
-import { useState, useCallback } from 'react'
-import { Upload, X, Image as ImageIcon } from 'lucide-react'
+import { useState, useCallback, useEffect } from 'react'
+import { Upload, X, Image as ImageIcon, Loader2, CheckCircle } from 'lucide-react'
 import api from '../../utils/api'
 
 const MAX_IMAGES = 10
@@ -18,19 +18,39 @@ const uploadImageToServer = async (file) => {
 
 export default function ReferenceUpload({ images = [], onChange }) {
   const [isDragOver, setIsDragOver] = useState(false)
+  const [uploadingIds, setUploadingIds] = useState(new Set())
+  
+  // 检查是否有图片正在上传
+  const isUploading = uploadingIds.size > 0
+  
+  // 通知父组件上传状态变化
+  useEffect(() => {
+    if (onChange) {
+      // 通过回调通知父组件
+      onChange.isUploading = isUploading
+    }
+  }, [isUploading])
   
   const handleFiles = useCallback(async (files) => {
     const fileArray = Array.from(files).filter(file => file.type.startsWith('image/'))
     
-    // 创建临时预览
+    // 创建临时预览（标记为上传中）
     const tempImages = fileArray.map(file => ({
       file,
       url: URL.createObjectURL(file),
-      id: `${Date.now()}-${Math.random()}`
+      id: `${Date.now()}-${Math.random()}`,
+      uploading: true  // 标记正在上传
     }))
     
     const allImages = [...images, ...tempImages].slice(0, MAX_IMAGES)
     onChange?.(allImages)
+    
+    // 标记正在上传的图片
+    setUploadingIds(prev => {
+      const newSet = new Set(prev)
+      tempImages.forEach(img => newSet.add(img.id))
+      return newSet
+    })
     
     // 后台上传每个图片
     for (const img of tempImages) {
@@ -40,13 +60,19 @@ export default function ReferenceUpload({ images = [], onChange }) {
         // 释放临时 URL 并更新为真实 URL
         URL.revokeObjectURL(img.url)
         onChange?.(prev => prev.map(p => 
-          p.id === img.id ? { ...p, url: uploadedUrl, file: null } : p
+          p.id === img.id ? { ...p, url: uploadedUrl, file: null, uploading: false } : p
         ))
       } catch (err) {
-        // 保留本地预览
+        // 上传失败
         onChange?.(prev => prev.map(p => 
-          p.id === img.id ? { ...p, file: null } : p
+          p.id === img.id ? { ...p, file: null, uploading: false, uploadError: true } : p
         ))
+      } finally {
+        setUploadingIds(prev => {
+          const newSet = new Set(prev)
+          newSet.delete(img.id)
+          return newSet
+        })
       }
     }
   }, [images, onChange])
@@ -76,13 +102,26 @@ export default function ReferenceUpload({ images = [], onChange }) {
   const handleRemove = useCallback((id) => {
     const newImages = images.filter(img => img.id !== id)
     onChange?.(newImages)
+    setUploadingIds(prev => {
+      const newSet = new Set(prev)
+      newSet.delete(id)
+      return newSet
+    })
   }, [images, onChange])
   
   return (
     <div>
       <div className="ai-section-title">
         <span>📤 参考生图 (可选)</span>
-        <span className="ai-upload-count">{images.length}/{MAX_IMAGES}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          {isUploading && (
+            <span style={{ color: '#f59e0b', fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+              <Loader2 size={12} className="animate-spin" />
+              上传中...
+            </span>
+          )}
+          <span className="ai-upload-count">{images.length}/{MAX_IMAGES}</span>
+        </div>
       </div>
       
       <div
@@ -90,7 +129,8 @@ export default function ReferenceUpload({ images = [], onChange }) {
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        onClick={() => document.getElementById('reference-upload-input')?.click()}
+        onClick={() => !isUploading && document.getElementById('reference-upload-input')?.click()}
+        style={{ opacity: isUploading ? 0.7 : 1, cursor: isUploading ? 'wait' : 'pointer' }}
       >
         {images.length === 0 ? (
           <div className="ai-upload-placeholder">
@@ -105,8 +145,59 @@ export default function ReferenceUpload({ images = [], onChange }) {
         ) : (
           <div className="ai-upload-grid">
             {images.map((img) => (
-              <div key={img.id} className="ai-upload-item">
-                <img src={img.url} alt="reference" />
+              <div key={img.id} className="ai-upload-item" style={{ position: 'relative' }}>
+                <img src={img.url} alt="reference" style={{ opacity: img.uploading ? 0.5 : 1 }} />
+                
+                {/* 上传状态覆盖层 */}
+                {img.uploading && (
+                  <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'rgba(0,0,0,0.5)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '8px'
+                  }}>
+                    <Loader2 size={20} className="animate-spin" style={{ color: 'white' }} />
+                  </div>
+                )}
+                
+                {/* 上传成功标记 */}
+                {!img.uploading && !img.uploadError && img.url?.startsWith('http') && (
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '4px',
+                    right: '4px',
+                    width: '16px',
+                    height: '16px',
+                    borderRadius: '50%',
+                    background: '#22c55e',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}>
+                    <CheckCircle size={12} style={{ color: 'white' }} />
+                  </div>
+                )}
+                
+                {/* 上传失败标记 */}
+                {img.uploadError && (
+                  <div style={{
+                    position: 'absolute',
+                    inset: 0,
+                    background: 'rgba(239,68,68,0.3)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: '8px',
+                    fontSize: '0.6rem',
+                    color: 'white'
+                  }}>
+                    上传失败
+                  </div>
+                )}
+                
                 <button
                   className="ai-upload-remove"
                   onClick={(e) => {
@@ -118,7 +209,7 @@ export default function ReferenceUpload({ images = [], onChange }) {
                 </button>
               </div>
             ))}
-            {images.length < MAX_IMAGES && (
+            {images.length < MAX_IMAGES && !isUploading && (
               <div
                 className="ai-upload-item"
                 style={{
@@ -147,6 +238,7 @@ export default function ReferenceUpload({ images = [], onChange }) {
         multiple
         onChange={handleInputChange}
         style={{ display: 'none' }}
+        disabled={isUploading}
       />
     </div>
   )

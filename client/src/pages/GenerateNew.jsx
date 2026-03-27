@@ -38,7 +38,7 @@ export default function GenerateNew() {
 
   // 判断当前模型是否支持参考图（纯视频模型不支持）
   const isImageModel = selectedModel?.type === 'image'
-  const canUseReference = isImageModel || selectedModel?.id === 'runninghub/sora2'
+  const canUseReference = isImageModel || selectedModel?.id === 'runninghub/sora2' || selectedModel?.id === 'runninghub/videoX'
     
   useEffect(() => {
     fetchApiEndpoints()

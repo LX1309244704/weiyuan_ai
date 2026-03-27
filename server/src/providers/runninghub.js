@@ -176,11 +176,11 @@ class RunningHubProvider extends BaseProvider {
         }
       ]
     },
-    // 视频模型 - 全能视频X-文生视频-低价渠道版
+    // 视频模型 - 全能视频X (低价渠道版，有图用图生，无图用文生)
     {
-      id: 'runninghub/videoX-t2v',
-      name: '全能视频X(文生视频)',
-      description: '低价渠道版文生视频，精准解析复杂长文本逻辑，电影级镜头调度',
+      id: 'runninghub/videoX',
+      name: '全能视频X',
+      description: '低价渠道版，精准解析复杂长文本逻辑，电影级镜头调度，有图用图生，无图用文生',
       type: 'video',
       icon: '🎬',
       pricePerCall: 50,
@@ -218,49 +218,6 @@ class RunningHubProvider extends BaseProvider {
           default: '6'
         }
       ]
-    },
-    // 视频模型 - 全能视频X-图生视频-低价渠道版
-    {
-      id: 'runninghub/videoX-i2v',
-      name: '全能视频X(图生视频)',
-      description: '低价渠道版图生视频，主体身份绝对锁定，时空稳定性卓越',
-      type: 'video',
-      icon: '🎬',
-      pricePerCall: 50,
-      defaultParams: { aspectRatio: '2:3', resolution: '480p', duration: '6' },
-      paramConfig: [
-        {
-          name: 'aspectRatio',
-          label: '视频比例',
-          type: 'select',
-          options: [
-            { value: '2:3', label: '2:3' },
-            { value: '3:2', label: '3:2' },
-            { value: '1:1', label: '1:1' },
-            { value: '16:9', label: '16:9' },
-            { value: '9:16', label: '9:16' }
-          ],
-          default: '2:3'
-        },
-        {
-          name: 'resolution',
-          label: '视频清晰度',
-          type: 'select',
-          options: [
-            { value: '720p', label: '720P (高清)' },
-            { value: '480p', label: '480P (标清)' }
-          ],
-          default: '480p'
-        },
-        {
-          name: 'duration',
-          label: '视频时长(秒)',
-          type: 'number',
-          min: 6,
-          max: 30,
-          default: '6'
-        }
-      ]
     }
   ];
 
@@ -281,8 +238,9 @@ class RunningHubProvider extends BaseProvider {
         'se2v': 'https://www.runninghub.cn/openapi/v2/rhart-video-v3.1-fast/start-end-to-video',
         'i2v': 'https://www.runninghub.cn/openapi/v2/rhart-video-v3.1-fast/image-to-video'
       },
-      'runninghub/videoX-t2v': 'https://www.runninghub.cn/openapi/v2/rhart-video-g/text-to-video',
-      'runninghub/videoX-i2v': 'https://www.runninghub.cn/openapi/v2/rhart-video-g/image-to-video'
+      'runninghub/videoX': (hasImage) => hasImage
+        ? 'https://www.runninghub.cn/openapi/v2/rhart-video-g/image-to-video'
+        : 'https://www.runninghub.cn/openapi/v2/rhart-video-g/text-to-video'
     };
     return apiUrls[modelId];
   }
@@ -346,16 +304,11 @@ class RunningHubProvider extends BaseProvider {
       body.duration = duration || '10';
       body.aspectRatio = aspectRatio || '9:16';
       body.storyboard = false;
-    } else if (this.modelId === 'runninghub/videoX-t2v') {
-      // 全能视频X-文生视频-低价渠道版
-      body.aspectRatio = aspectRatio || '2:3';
-      body.resolution = resolution || '720p';
-      body.duration = duration || 6;
-    } else if (this.modelId === 'runninghub/videoX-i2v') {
-      // 全能视频X-图生视频-低价渠道版
+    } else if (this.modelId === 'runninghub/videoX') {
+      // 全能视频X (低价渠道版，有图用图生，无图用文生)
       if (imageUrls && imageUrls.length > 0) body.imageUrls = imageUrls;
       body.aspectRatio = aspectRatio || '2:3';
-      body.resolution = resolution || '480p';
+      body.resolution = resolution || '720p';
       body.duration = duration || 6;
     } else {
       // 图片生成
@@ -395,10 +348,10 @@ class RunningHubProvider extends BaseProvider {
       return requestBody.imageUrl
         ? 'https://www.runninghub.cn/openapi/v2/rhart-video-s/image-to-video'
         : 'https://www.runninghub.cn/openapi/v2/rhart-video-s/text-to-video';
-    } else if (modelId === 'runninghub/videoX-t2v') {
-      return 'https://www.runninghub.cn/openapi/v2/rhart-video-g/text-to-video';
-    } else if (modelId === 'runninghub/videoX-i2v') {
-      return 'https://www.runninghub.cn/openapi/v2/rhart-video-g/image-to-video';
+    } else if (modelId === 'runninghub/videoX') {
+      return requestBody.imageUrls && requestBody.imageUrls.length > 0
+        ? 'https://www.runninghub.cn/openapi/v2/rhart-video-g/image-to-video'
+        : 'https://www.runninghub.cn/openapi/v2/rhart-video-g/text-to-video';
     }
     
     return 'https://www.runninghub.cn/openapi/v2/rhart-image-n-pro/text-to-image';

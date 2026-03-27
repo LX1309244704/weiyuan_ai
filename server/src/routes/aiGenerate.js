@@ -16,8 +16,7 @@ const MODEL_DISPLAY_NAMES = {
   'runninghub/nanobanana': '香蕉Pro',
   'runninghub/veo31': 'VEO3.1视频',
   'runninghub/sora2': 'Sora2视频',
-  'runninghub/videoX-t2v': '全能视频X(文生视频)',
-  'runninghub/videoX-i2v': '全能视频X(图生视频)',
+  'runninghub/videoX': '全能视频X',
   'huoshan/image': '火山图片'
 };
 

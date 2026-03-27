@@ -307,7 +307,10 @@ class RunningHubProvider extends BaseProvider {
       body.storyboard = false;
     } else if (this.modelId === 'runninghub/videoX') {
       // 全能视频X (低价渠道版，有图用图生，无图用文生)
-      if (imageUrls && imageUrls.length > 0) body.imageUrls = imageUrls;
+      // 图生视频只支持1张图片
+      if (imageUrls && imageUrls.length > 0) {
+        body.imageUrls = [imageUrls[0]]; // 只取第一张
+      }
       body.aspectRatio = aspectRatio || '2:3';
       body.resolution = resolution || '720p';
       body.duration = duration || 6;

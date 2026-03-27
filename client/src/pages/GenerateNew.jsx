@@ -46,7 +46,63 @@ export default function GenerateNew() {
     
   // 检查是否有图片正在上传
   const hasUploadingImages = referenceImages.some(img => img.uploading)
+  
+  // SSE 连接管理 - 共用一个连接接收所有任务更新
+  useEffect(() => {
+    if (!isAuthenticated || !token) return
     
+    // 建立 SSE 连接（通过URL参数传递token，因为EventSource不支持自定义headers）
+    const sseUrl = `/api/ai-generate/stream?token=${encodeURIComponent(token)}`
+    const eventSource = new EventSource(sseUrl)
+    
+    eventSource.onopen = () => {
+      console.log('[SSE] Connected')
+    }
+    
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        console.log('[SSE] Received update:', data)
+        
+        // 更新任务状态
+        if (data.taskId) {
+          setTasks(prev => {
+            const exists = prev.find(t => t.taskId === data.taskId || t.realTaskId === data.taskId)
+            if (exists) {
+              return prev.map(t => 
+                (t.taskId === data.taskId || t.realTaskId === data.taskId)
+                  ? { ...t, ...data, status: data.status || t.status }
+                  : t
+              ).filter(t => t.status !== 'completed' || t.resultUrl)
+            }
+            // 新任务
+            if (data.status === 'completed' || data.status === 'failed') {
+              return prev
+            }
+            return [{ taskId: data.taskId, ...data }, ...prev]
+          })
+        }
+        
+        // 更新余额
+        if (data.balance !== undefined) {
+          setBalance(data.balance)
+        }
+      } catch (err) {
+        console.error('[SSE] Parse error:', err)
+      }
+    }
+    
+    eventSource.onerror = (err) => {
+      console.error('[SSE] Connection error:', err)
+      // 连接错误时关闭，浏览器会自动重试
+    }
+    
+    return () => {
+      eventSource.close()
+      console.log('[SSE] Disconnected')
+    }
+  }, [isAuthenticated, token])
+  
   useEffect(() => {
     fetchApiEndpoints()
     if (isAuthenticated) {

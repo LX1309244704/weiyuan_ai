@@ -64,9 +64,11 @@ function AiModelsTab() {
   const [loading, setLoading] = useState(true)
   const [editingModel, setEditingModel] = useState(null)
   const [showModal, setShowModal] = useState(false)
+  const [showPriceModal, setShowPriceModal] = useState(false)
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [showApiKey, setShowApiKey] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [modelPrices, setModelPrices] = useState({})
 
   useEffect(() => { fetchModels() }, [])
 
@@ -84,6 +86,20 @@ function AiModelsTab() {
     setShowModal(true)
   }
 
+  const handleEditPrices = (model) => {
+    setEditingModel(model)
+    // 解析现有价格配置
+    try {
+      const prices = model.modelPrices 
+        ? (typeof model.modelPrices === 'string' ? JSON.parse(model.modelPrices) : model.modelPrices)
+        : {}
+      setModelPrices(prices)
+    } catch (e) {
+      setModelPrices({})
+    }
+    setShowPriceModal(true)
+  }
+
   const handleSave = async () => {
     if (!apiKeyInput.trim()) {
       alert('请输入 API Key')
@@ -94,6 +110,20 @@ function AiModelsTab() {
       await api.put(`/admin/ai-models/${editingModel.id}`, { apiKey: apiKeyInput })
       alert('保存成功')
       setShowModal(false)
+      fetchModels()
+    } catch (e) {
+      alert('保存失败: ' + (e.response?.data?.error || e.message))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSavePrices = async () => {
+    setSaving(true)
+    try {
+      await api.put(`/admin/ai-models/${editingModel.id}`, { modelPrices: JSON.stringify(modelPrices) })
+      alert('保存成功')
+      setShowPriceModal(false)
       fetchModels()
     } catch (e) {
       alert('保存失败: ' + (e.response?.data?.error || e.message))
@@ -119,11 +149,28 @@ function AiModelsTab() {
     huoshan: '火山引擎大模型服务'
   }
 
+  // 获取提供商下的所有模型
+  const getProviderModels = (provider) => {
+    const providerModels = {
+      runninghub: [
+        { id: 'runninghub/bananaflash', name: '香蕉Flash', defaultPrice: 30 },
+        { id: 'runninghub/nanobanana', name: '香蕉Pro', defaultPrice: 50 },
+        { id: 'runninghub/sora2', name: 'Sora2视频', defaultPrice: 80 },
+        { id: 'runninghub/veo31', name: 'VEO3.1视频', defaultPrice: 100 },
+        { id: 'runninghub/videoX', name: '全能视频X', defaultPrice: 50 }
+      ],
+      huoshan: [
+        { id: 'huoshan/image', name: '火山图片', defaultPrice: 50 }
+      ]
+    }
+    return providerModels[provider] || []
+  }
+
   return (
     <div>
       <div className="card" style={{ padding: '1.5rem', marginBottom: '1rem', background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', color: 'white' }}>
         <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '0.5rem' }}>AI 模型配置</h3>
-        <p style={{ fontSize: '0.875rem', opacity: 0.9 }}>配置 AI 厂商的 API Key，这些配置将用于 AI 创作功能</p>
+        <p style={{ fontSize: '0.875rem', opacity: 0.9 }}>配置 AI 厂商的 API Key 和模型积分价格</p>
       </div>
 
       {loading ? (
@@ -172,9 +219,13 @@ function AiModelsTab() {
               </div>
 
               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                <button onClick={() => handleEdit(model)} className="btn-primary" style={{ flex: 1 }}>
+                <button onClick={() => handleEdit(model)} className="btn-outline" style={{ flex: 1 }}>
                   <Edit2 size={14} style={{ marginRight: '0.5rem' }} />
-                  {model.apiKey ? '更新 Key' : '配置 Key'}
+                  API Key
+                </button>
+                <button onClick={() => handleEditPrices(model)} className="btn-primary" style={{ flex: 1 }}>
+                  <Settings size={14} style={{ marginRight: '0.5rem' }} />
+                  积分价格
                 </button>
                 <button 
                   onClick={() => handleToggle(model)} 
@@ -231,6 +282,43 @@ function AiModelsTab() {
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
             <button type="button" onClick={() => setShowModal(false)} className="btn-secondary" style={{ flex: 1 }}>取消</button>
             <button type="button" onClick={handleSave} disabled={saving} className="btn-primary" style={{ flex: 1 }}>
+              {saving ? '保存中...' : '保存'}
+            </button>
+          </div>
+        </Modal>
+      )}
+
+      {showPriceModal && editingModel && (
+        <Modal title={`配置 ${editingModel.name} 模型积分`} onClose={() => setShowPriceModal(false)} maxWidth="600px">
+          <div style={{ marginBottom: '1rem' }}>
+            <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '1rem' }}>
+              设置每个模型每次调用消耗的积分数量。
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {getProviderModels(editingModel.provider).map(m => (
+                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', background: '#f8fafc', borderRadius: '8px' }}>
+                  <div style={{ flex: 1 }}>
+                    <p style={{ fontWeight: 500, fontSize: '0.875rem' }}>{m.name}</p>
+                    <p style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{m.id}</p>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input
+                      type="number"
+                      className="input"
+                      value={modelPrices[m.id] ?? m.defaultPrice}
+                      onChange={e => setModelPrices({ ...modelPrices, [m.id]: parseInt(e.target.value) || 0 })}
+                      style={{ width: '80px', textAlign: 'center' }}
+                      min="0"
+                    />
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>积分/次</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.5rem' }}>
+            <button type="button" onClick={() => setShowPriceModal(false)} className="btn-secondary" style={{ flex: 1 }}>取消</button>
+            <button type="button" onClick={handleSavePrices} disabled={saving} className="btn-primary" style={{ flex: 1 }}>
               {saving ? '保存中...' : '保存'}
             </button>
           </div>

@@ -207,7 +207,7 @@ router.get('/ai-models', requireAdmin, async (req, res, next) => {
 router.put('/ai-models/:id', requireAdmin, async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, apiKey, isActive } = req.body;
+    const { name, apiKey, isActive, modelPrices } = req.body;
     
     const model = await AiModel.findByPk(id);
     if (!model) {
@@ -217,6 +217,7 @@ router.put('/ai-models/:id', requireAdmin, async (req, res, next) => {
     if (name) model.name = name;
     if (apiKey !== undefined) model.apiKey = apiKey ? encrypt(apiKey) : null;
     if (isActive !== undefined) model.isActive = isActive;
+    if (modelPrices !== undefined) model.modelPrices = modelPrices;
     
     await model.save();
     

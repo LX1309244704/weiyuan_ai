@@ -72,6 +72,7 @@ CREATE TABLE `ai_models` (
   `name` VARCHAR(100) NOT NULL COMMENT '显示名称',
   `provider` VARCHAR(50) NOT NULL COMMENT '厂商标识:runninghub,huoshan等',
   `api_key` TEXT COMMENT 'API密钥(加密存储)',
+  `model_prices` JSON COMMENT '模型积分配置 {"模型ID": 积分价格}',
   `is_active` TINYINT(1) DEFAULT 1 COMMENT '是否启用',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',

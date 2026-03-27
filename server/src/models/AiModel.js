@@ -23,6 +23,11 @@ module.exports = (sequelize, DataTypes) => {
       field: 'api_key',
       comment: 'API密钥(加密存储)'
     },
+    modelPrices: {
+      type: DataTypes.JSON,
+      field: 'model_prices',
+      comment: '模型积分配置 {"模型ID": 积分价格}'
+    },
     isActive: {
       type: DataTypes.BOOLEAN,
       defaultValue: true,

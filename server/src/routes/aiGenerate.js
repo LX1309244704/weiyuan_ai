@@ -47,7 +47,22 @@ router.get('/models', async (req, res) => {
       }
       const ProviderClass = providerManager.providers.get(p.provider);
       if (ProviderClass && ProviderClass.models) {
+        // 解析数据库中的自定义价格
+        let customPrices = {};
+        if (p.modelPrices) {
+          try {
+            customPrices = typeof p.modelPrices === 'string' 
+              ? JSON.parse(p.modelPrices) 
+              : p.modelPrices;
+          } catch (e) {}
+        }
+        
         for (const m of ProviderClass.models) {
+          // 优先使用数据库中的自定义价格
+          const pricePerCall = customPrices[m.id] !== undefined 
+            ? customPrices[m.id] 
+            : (m.pricePerCall || 50);
+            
           models.push({
             id: m.id,
             name: m.name || m.dbName || p.name,
@@ -59,7 +74,7 @@ router.get('/models', async (req, res) => {
             pathPrefix: m.id,
             defaultParams: m.defaultParams || {},
             paramConfig: m.paramConfig || [],
-            pricePerCall: m.pricePerCall || 50,
+            pricePerCall,
             apiKey: p.apiKey || ''  // 返回 API Key 用于图片上传
           });
         }
@@ -109,9 +124,24 @@ router.post('/*', async (req, res) => {
   providerHandler.modelId = pathPrefix;
   
   // 获取模型配置（用于定价）
+  // 优先从数据库读取 model_prices，如果没有则使用代码中的默认值
   const ProviderClass = providerManager.providers.get(provider);
   const modelConfig = ProviderClass?.models?.find(m => m.id === pathPrefix);
-  const cost = modelConfig?.pricePerCall || 50;
+  let cost = modelConfig?.pricePerCall || 50;
+  
+  // 检查数据库中的自定义价格配置
+  if (providerConfig.modelPrices) {
+    try {
+      const prices = typeof providerConfig.modelPrices === 'string' 
+        ? JSON.parse(providerConfig.modelPrices) 
+        : providerConfig.modelPrices;
+      if (prices && prices[pathPrefix] !== undefined) {
+        cost = prices[pathPrefix];
+      }
+    } catch (e) {
+      console.error('[AIGenerate] Failed to parse modelPrices:', e.message);
+    }
+  }
   
   // 验证用户
   let apiKey = req.headers['x-api-key'] || req.headers['authorization'];

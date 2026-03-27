@@ -184,7 +184,7 @@ class RunningHubProvider extends BaseProvider {
       type: 'video',
       icon: '🎬',
       pricePerCall: 50,
-      defaultParams: { aspectRatio: '2:3', resolution: '720p', duration: '6' },
+      defaultParams: { aspectRatio: '2:3', resolution: '720p', duration: 6 },
       paramConfig: [
         {
           name: 'aspectRatio',
@@ -320,7 +320,7 @@ class RunningHubProvider extends BaseProvider {
       }
       body.aspectRatio = aspectRatio || '2:3';
       body.resolution = resolution || '720p';
-      body.duration = duration || 6;
+      body.duration = parseInt(duration) || 6; // 确保是数字类型
     } else {
       // 图片生成
       const resolutionMap = {

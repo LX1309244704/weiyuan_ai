@@ -212,9 +212,10 @@ class RunningHubProvider extends BaseProvider {
         {
           name: 'duration',
           label: '视频时长(秒)',
-          type: 'number',
+          type: 'slider',
           min: 6,
           max: 30,
+          step: 1,
           default: '6'
         }
       ]

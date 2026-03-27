@@ -171,13 +171,12 @@ router.post('/*', async (req, res) => {
     if (firstFrameUrl) allImageUrls.unshift(firstFrameUrl);
     if (lastFrameUrl) allImageUrls.push(lastFrameUrl);
     
-    // 构建请求（传入 modelType 以便选择正确的 API）
+    // 构建请求（只传递需要的参数，移除 modelType）
     const requestBody = providerHandler.buildRequest({ 
       prompt, 
       imageUrls, 
       firstFrameUrl, 
       lastFrameUrl,
-      modelType,
       ...params 
     });
     

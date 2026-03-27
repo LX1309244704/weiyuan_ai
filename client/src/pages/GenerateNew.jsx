@@ -228,24 +228,33 @@ export default function GenerateNew() {
       // 上传本地参考图片到 RunningHub
       let imageUrls = []
       
+      console.log('[Generate] Processing images:', currentImages.length, currentImages.map(img => ({ url: img.url?.substring(0, 50), hasFile: !!img.file })))
+      
       // 检查图片是否已经上传（是 HTTPS URL 则是已上传）
       for (const img of currentImages) {
         if (img && img.url) {
           // 如果已经是远程 URL，直接使用
           if (img.url.startsWith('http://') || img.url.startsWith('https://')) {
             imageUrls.push(img.url)
+            console.log('[Generate] Using remote URL:', img.url.substring(0, 50))
           } else if (img.url.startsWith('data:')) {
             // base64 图片，需要上传
             try {
               const file = base64ToFile(img.url, `reference_${img.id}.png`)
               const uploadedUrl = await uploadToRunningHub(file, selectedModel.apiKey)
               imageUrls.push(uploadedUrl)
+              console.log('[Generate] Uploaded base64:', uploadedUrl.substring(0, 50))
             } catch (uploadErr) {
               imageUrls.push(img.url)
+              console.log('[Generate] Failed to upload base64, using original:', img.url.substring(0, 50))
             }
+          } else {
+            console.log('[Generate] Skipping URL (not http/https/data):', img.url.substring(0, 50))
           }
         }
       }
+      
+      console.log('[Generate] Final imageUrls:', imageUrls.length, imageUrls.map(u => u.substring(0, 50)))
       
       /*
       if (currentImages.length > 0 && selectedModel?.apiKey) {

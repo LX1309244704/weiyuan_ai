@@ -11,6 +11,10 @@ const { redis } = require('./config/redis');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust proxy - required when behind Nginx/reverse proxy
+// This allows express-rate-limit to correctly identify user IPs from X-Forwarded-For header
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(cors({ origin: true, credentials: true }));
@@ -19,13 +23,17 @@ app.use(cors({ origin: true, credentials: true }));
 const generalLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 3000,
-  message: { error: 'Too many requests' }
+  message: { error: 'Too many requests' },
+  standardHeaders: true,
+  legacyHeaders: false
 });
 
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 100,
-  message: { error: 'Too many login attempts' }
+  message: { error: 'Too many login attempts' },
+  standardHeaders: true,
+  legacyHeaders: false
 });
 
 app.use('/api/', generalLimiter);

@@ -47,58 +47,90 @@ export default function GenerateNew() {
   // 检查是否有图片正在上传
   const hasUploadingImages = referenceImages.some(img => img.uploading)
   
-  // SSE 连接管理 - 共用一个连接接收所有任务更新
+  // SSE 连接管理 - 共用一个连接接收所有任务更新，支持自动重连
   useEffect(() => {
     if (!isAuthenticated || !token) return
     
-    // 建立 SSE 连接（通过URL参数传递token，因为EventSource不支持自定义headers）
-    const sseUrl = `/api/ai-generate/stream?token=${encodeURIComponent(token)}`
-    const eventSource = new EventSource(sseUrl)
+    let eventSource = null
+    let reconnectTimer = null
+    let reconnectAttempts = 0
+    const maxReconnectAttempts = 10
+    const baseReconnectDelay = 1000 // 1秒
     
-    eventSource.onopen = () => {
-      console.log('[SSE] Connected')
-    }
-    
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data)
-        console.log('[SSE] Received update:', data)
-        
-        // 更新任务状态
-        if (data.taskId) {
-          setTasks(prev => {
-            const exists = prev.find(t => t.taskId === data.taskId || t.realTaskId === data.taskId)
-            if (exists) {
-              return prev.map(t => 
-                (t.taskId === data.taskId || t.realTaskId === data.taskId)
-                  ? { ...t, ...data, status: data.status || t.status }
-                  : t
-              ).filter(t => t.status !== 'completed' || t.resultUrl)
-            }
-            // 新任务
-            if (data.status === 'completed' || data.status === 'failed') {
-              return prev
-            }
-            return [{ taskId: data.taskId, ...data }, ...prev]
-          })
+    const connect = () => {
+      // 建立 SSE 连接（通过URL参数传递token，因为EventSource不支持自定义headers）
+      const sseUrl = `/api/ai-generate/stream?token=${encodeURIComponent(token)}`
+      eventSource = new EventSource(sseUrl)
+      
+      eventSource.onopen = () => {
+        console.log('[SSE] Connected')
+        reconnectAttempts = 0 // 重置重连计数
+      }
+      
+      eventSource.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          console.log('[SSE] Received update:', data)
+          
+          // 更新任务状态
+          if (data.taskId) {
+            setTasks(prev => {
+              const exists = prev.find(t => t.taskId === data.taskId || t.realTaskId === data.taskId)
+              if (exists) {
+                return prev.map(t => 
+                  (t.taskId === data.taskId || t.realTaskId === data.taskId)
+                    ? { ...t, ...data, status: data.status || t.status }
+                    : t
+                ).filter(t => t.status !== 'completed' || t.resultUrl)
+              }
+              // 新任务
+              if (data.status === 'completed' || data.status === 'failed') {
+                return prev
+              }
+              return [{ taskId: data.taskId, ...data }, ...prev]
+            })
+          }
+          
+          // 更新余额
+          if (data.balance !== undefined) {
+            setBalance(data.balance)
+          }
+        } catch (err) {
+          console.error('[SSE] Parse error:', err)
         }
+      }
+      
+      eventSource.onerror = (err) => {
+        console.error('[SSE] Connection error:', err)
+        eventSource.close()
+        eventSource = null
         
-        // 更新余额
-        if (data.balance !== undefined) {
-          setBalance(data.balance)
+        // 自动重连
+        if (reconnectAttempts < maxReconnectAttempts) {
+          const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts) // 指数退避
+          console.log(`[SSE] Reconnecting in ${delay}ms (attempt ${reconnectAttempts + 1}/${maxReconnectAttempts})`)
+          reconnectTimer = setTimeout(() => {
+            reconnectAttempts++
+            connect()
+          }, delay)
+        } else {
+          console.error('[SSE] Max reconnect attempts reached')
         }
-      } catch (err) {
-        console.error('[SSE] Parse error:', err)
       }
     }
     
-    eventSource.onerror = (err) => {
-      console.error('[SSE] Connection error:', err)
-      // 连接错误时关闭，浏览器会自动重试
-    }
+    // 初始连接
+    connect()
     
     return () => {
-      eventSource.close()
+      if (eventSource) {
+        eventSource.close()
+        eventSource = null
+      }
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer)
+        reconnectTimer = null
+      }
       console.log('[SSE] Disconnected')
     }
   }, [isAuthenticated, token])

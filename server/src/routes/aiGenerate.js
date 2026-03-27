@@ -143,6 +143,16 @@ router.post('/*', async (req, res) => {
     }
   }
   
+  // 获取请求参数中的duration（用于视频按秒计费）
+  const { duration: requestDuration } = req.body;
+  
+  // 全能视频X按秒计费：基础价格 × 秒数
+  if (pathPrefix === 'runninghub/videoX' && requestDuration) {
+    const durationSeconds = parseInt(requestDuration) || 6;
+    cost = cost * durationSeconds;
+    console.log(`[AIGenerate] videoX pricing: ${cost} = base ${modelConfig?.pricePerCall || 50} × ${durationSeconds}s`);
+  }
+  
   // 验证用户
   let apiKey = req.headers['x-api-key'] || req.headers['authorization'];
   if (apiKey && apiKey.startsWith('Bearer ')) apiKey = apiKey.substring(7);

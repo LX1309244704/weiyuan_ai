@@ -180,6 +180,28 @@ router.post('/users/:id/balance', requireAdmin, async (req, res, next) => {
   }
 });
 
+/**
+ * 获取用户详情
+ * GET /api/admin/users/:id
+ */
+router.get('/users/:id', requireAdmin, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    
+    const user = await User.findByPk(id, {
+      attributes: ['id', 'username', 'email', 'balance', 'role', 'isActive', 'apiKey', 'totalPurchased', 'created_at']
+    });
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    res.json({ success: true, user });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // =====================================================
 // AI 厂商配置管理
 // =====================================================

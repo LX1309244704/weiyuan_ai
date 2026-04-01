@@ -74,6 +74,7 @@ function GenerateHistory() {
       const res = await api.get('/ai-generate/tasks', {
         params: {
           status: filter === 'all' ? undefined : filter,
+          type: filter === 'all' ? 'all' : filter,  // 传递 type 参数给后端
           page,
           pageSize: 10
         },
@@ -100,6 +101,7 @@ function GenerateHistory() {
       const res = await api.get('/ai-generate/tasks', {
         params: {
           status: filter === 'all' ? undefined : filter,
+          type: filter === 'all' ? 'all' : filter,  // 传递 type 参数给后端
           page: nextPage,
           pageSize: 10
         },
@@ -151,17 +153,6 @@ function GenerateHistory() {
     const url = item.resultUrl || ''
     const model = (item.modelName || '').toLowerCase()
     return url.includes('.mp4') || url.includes('.webm') || model.includes('veo') || model.includes('video') || model.includes('grok') || model.includes('sora')
-  }
-  
-  const getModelDisplayName = (modelId) => {
-    const modelNames = {
-      'runninghub/nanobanana': '香蕉Pro',
-      'runninghub/bananaflash': '香蕉Flash',
-      'runninghub/veo31': 'VEO3.1视频生成',
-      'runninghub/sora2': 'Sora2 视频生成',
-      'huoshan/image': '火山图片'
-    }
-    return modelNames[modelId] || modelId?.split('/')?.pop() || modelId || '未知模型'
   }
   
   const getStatusBadge = (status) => {

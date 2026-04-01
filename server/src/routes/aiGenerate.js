@@ -406,11 +406,22 @@ router.get('/tasks', async (req, res) => {
   const user = await User.findOne({ where: { apiKey } });
   if (!user) return res.status(401).json({ success: false, error: 'Invalid API Key' });
   
-  const { status, page = 1, pageSize = 10 } = req.query;
+  const { status, type, page = 1, pageSize = 10 } = req.query;
   const limit = parseInt(pageSize) || 10;
   const offset = (parseInt(page) - 1) * limit;
   const where = { userId: user.id, deletedAt: null };
+  
   if (status && status !== 'all') where.status = status;
+  
+  // 按类型筛选（video/image）
+  if (type && type !== 'all') {
+    const videoModels = ['veo', 'video', 'sora', 'grok'];
+    if (type === 'video') {
+      where.modelName = { [require('sequelize').Op.or]: videoModels.map(v => ({ [require('sequelize').Op.like]: `%${v}%` })) };
+    } else if (type === 'image') {
+      where.modelName = { [require('sequelize').Op.not]: { [require('sequelize').Op.or]: videoModels.map(v => ({ [require('sequelize').Op.like]: `%${v}%` })) } };
+    }
+  }
   
   const { count, rows } = await AiGenerateTask.findAndCountAll({ where, order: [['created_at', 'DESC']], limit, offset });
   

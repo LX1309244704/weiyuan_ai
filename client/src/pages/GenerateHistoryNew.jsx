@@ -195,11 +195,6 @@ function GenerateHistory() {
     }
   }
   
-  const filteredHistory = history.filter(item => {
-    if (filter === 'all') return true
-    return item.type === filter || (item.modelName?.toLowerCase().includes('video') ? 'video' : 'image') === filter
-  })
-  
   return (
     <div style={{ 
       display: 'flex', 

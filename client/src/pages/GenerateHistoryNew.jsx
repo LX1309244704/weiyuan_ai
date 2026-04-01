@@ -17,7 +17,6 @@ function GenerateHistory() {
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
-  const [typeFilter, setTypeFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [userApiKey, setUserApiKey] = useState('')
@@ -40,7 +39,7 @@ function GenerateHistory() {
       setPage(1)
       fetchHistory()
     }
-  }, [userApiKey, filter, typeFilter])
+  }, [userApiKey, filter])
 
   const handleDeleteTask = async (taskId) => {
     if (!confirm('确定要删除这条记录吗？')) return
@@ -75,7 +74,6 @@ function GenerateHistory() {
       const res = await api.get('/ai-generate/tasks', {
         params: {
           status: filter === 'all' ? undefined : filter,
-          type: typeFilter,
           page,
           pageSize: 10
         },
@@ -102,7 +100,6 @@ function GenerateHistory() {
       const res = await api.get('/ai-generate/tasks', {
         params: {
           status: filter === 'all' ? undefined : filter,
-          type: typeFilter,
           page: nextPage,
           pageSize: 10
         },
@@ -136,7 +133,7 @@ function GenerateHistory() {
     
     container.addEventListener('scroll', handleScroll)
     return () => container.removeEventListener('scroll', handleScroll)
-  }, [hasMore, loadingMore, page, filter, typeFilter, userApiKey])
+  }, [hasMore, loadingMore, page, filter, userApiKey])
   
   const handleDownload = (url) => {
     if (!url) return
@@ -202,7 +199,8 @@ function GenerateHistory() {
   
   const filteredHistory = history.filter(item => {
     if (filter === 'all') return true
-    return item.type === filter || (item.modelName?.toLowerCase().includes('video') ? 'video' : 'image') === filter
+    const itemIsVideo = isVideo(item)
+    return filter === 'video' ? itemIsVideo : !itemIsVideo
   })
   
   return (

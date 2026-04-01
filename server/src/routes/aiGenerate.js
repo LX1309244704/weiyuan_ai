@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
-const { Op } = require('sequelize');
 const { User, AiModel, AiGenerateTask, BalanceLog, sequelize } = require('../models');
 const { redis, KEYS, TTL } = require('../config/redis');
 const providerManager = require('../providers');
@@ -407,23 +406,11 @@ router.get('/tasks', async (req, res) => {
   const user = await User.findOne({ where: { apiKey } });
   if (!user) return res.status(401).json({ success: false, error: 'Invalid API Key' });
   
-  const { status, type, page = 1, pageSize = 10 } = req.query;
+  const { status, page = 1, pageSize = 10 } = req.query;
   const limit = parseInt(pageSize) || 10;
   const offset = (parseInt(page) - 1) * limit;
   const where = { userId: user.id, deletedAt: null };
-  
   if (status && status !== 'all') where.status = status;
-  
-  // 按类型筛选（video/image）
-  if (type && type !== 'all') {
-    const videoModels = ['veo', 'video', 'sora', 'grok'];
-    if (type === 'video') {
-      where[Op.or] = videoModels.map(v => ({ modelName: { [Op.like]: `%${v}%` } }));
-    } else if (type === 'image') {
-      // 图片类型：排除视频模型
-      where[Op.and] = videoModels.map(v => ({ modelName: { [Op.notLike]: `%${v}%` } }));
-    }
-  }
   
   const { count, rows } = await AiGenerateTask.findAndCountAll({ where, order: [['created_at', 'DESC']], limit, offset });
   

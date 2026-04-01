@@ -17,6 +17,7 @@ function GenerateHistory() {
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
+  const [typeFilter, setTypeFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [userApiKey, setUserApiKey] = useState('')
@@ -39,7 +40,7 @@ function GenerateHistory() {
       setPage(1)
       fetchHistory()
     }
-  }, [userApiKey, filter])
+  }, [userApiKey, filter, typeFilter])
 
   const handleDeleteTask = async (taskId) => {
     if (!confirm('确定要删除这条记录吗？')) return
@@ -74,7 +75,7 @@ function GenerateHistory() {
       const res = await api.get('/ai-generate/tasks', {
         params: {
           status: filter === 'all' ? undefined : filter,
-          type: filter === 'all' ? 'all' : filter,  // 传递 type 参数给后端
+          type: typeFilter,
           page,
           pageSize: 10
         },
@@ -101,7 +102,7 @@ function GenerateHistory() {
       const res = await api.get('/ai-generate/tasks', {
         params: {
           status: filter === 'all' ? undefined : filter,
-          type: filter === 'all' ? 'all' : filter,  // 传递 type 参数给后端
+          type: typeFilter,
           page: nextPage,
           pageSize: 10
         },
@@ -135,7 +136,7 @@ function GenerateHistory() {
     
     container.addEventListener('scroll', handleScroll)
     return () => container.removeEventListener('scroll', handleScroll)
-  }, [hasMore, loadingMore, page, filter, userApiKey])
+  }, [hasMore, loadingMore, page, filter, typeFilter, userApiKey])
   
   const handleDownload = (url) => {
     if (!url) return
@@ -157,9 +158,9 @@ function GenerateHistory() {
   
   const getModelDisplayName = (modelId) => {
     const modelNames = {
-      'runninghub/nanobanana': '香蕉 Pro',
-      'runninghub/bananaflash': '香蕉 Flash',
-      'runninghub/veo31': 'VEO3.1 视频生成',
+      'runninghub/nanobanana': '香蕉Pro',
+      'runninghub/bananaflash': '香蕉Flash',
+      'runninghub/veo31': 'VEO3.1视频生成',
       'runninghub/sora2': 'Sora2 视频生成',
       'huoshan/image': '火山图片'
     }
@@ -201,8 +202,7 @@ function GenerateHistory() {
   
   const filteredHistory = history.filter(item => {
     if (filter === 'all') return true
-    const itemIsVideo = isVideo(item)
-    return filter === 'video' ? itemIsVideo : !itemIsVideo
+    return item.type === filter || (item.modelName?.toLowerCase().includes('video') ? 'video' : 'image') === filter
   })
   
   return (

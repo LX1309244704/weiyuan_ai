@@ -16,7 +16,6 @@ function GenerateHistory() {
   const { isAuthenticated } = useAuthStore()
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState('all')
   const [typeFilter, setTypeFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
@@ -74,7 +73,7 @@ function GenerateHistory() {
     try {
       const res = await api.get('/ai-generate/tasks', {
         params: {
-          status: filter === 'all' ? undefined : filter,
+          status: 'all',
           type: typeFilter,
           page,
           pageSize: 10
@@ -101,7 +100,7 @@ function GenerateHistory() {
       const nextPage = page + 1
       const res = await api.get('/ai-generate/tasks', {
         params: {
-          status: filter === 'all' ? undefined : filter,
+          status: 'all',
           type: typeFilter,
           page: nextPage,
           pageSize: 10
@@ -128,7 +127,6 @@ function GenerateHistory() {
     
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = container
-      // 距离底部还有 200px 时加载
       if (scrollHeight - scrollTop - clientHeight < 200 && hasMore && !loadingMore) {
         loadMore()
       }
@@ -136,7 +134,7 @@ function GenerateHistory() {
     
     container.addEventListener('scroll', handleScroll)
     return () => container.removeEventListener('scroll', handleScroll)
-  }, [hasMore, loadingMore, page, filter, typeFilter, userApiKey])
+  }, [hasMore, loadingMore, page, typeFilter, userApiKey])
   
   const handleDownload = (url) => {
     if (!url) return
@@ -200,10 +198,7 @@ function GenerateHistory() {
     }
   }
   
-  const filteredHistory = history.filter(item => {
-    if (filter === 'all') return true
-    return item.type === filter || (item.modelName?.toLowerCase().includes('video') ? 'video' : 'image') === filter
-  })
+  const filteredHistory = history
   
   return (
     <div style={{ 
@@ -216,6 +211,42 @@ function GenerateHistory() {
     }}>
       <TopNavigationBar title="Weiyuan AI" />
       
+      <div style={{
+        flex: 1,
+        overflow: 'auto',
+        display: 'flex',
+        flexDirection: 'column'
+      }}>
+        <div style={{ 
+          padding: '1.5rem 2rem',
+          borderBottom: '1px solid var(--ai-border-color)',
+          backgroundColor: 'var(--ai-bg-secondary)',
+          display: 'flex',
+          justifyContent: 'flex-end'
+        }}>
+          <Link 
+            to="/generate" 
+            style={{
+              padding: '0.5rem 1.25rem',
+              background: 'linear-gradient(135deg, var(--ai-accent-green), var(--ai-accent-green-hover))',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#000',
+              fontWeight: 600,
+              textDecoration: 'none',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              cursor: 'pointer',
+              fontSize: '0.875rem',
+              boxShadow: '0 2px 8px rgba(74, 222, 128, 0.3)'
+            }}
+          >
+            <Sparkles size={16} />
+            新的生成
+          </Link>
+        </div>
+        
         <div
           ref={listContainerRef}
           style={{
@@ -224,66 +255,6 @@ function GenerateHistory() {
             overflow: 'auto'
           }}
         >
-        <div style={{ 
-          padding: '1.5rem 2rem',
-          borderBottom: '1px solid var(--ai-border-color)',
-          backgroundColor: 'var(--ai-bg-secondary)'
-        }}>
-          <div style={{ 
-            display: 'flex', 
-            gap: '0.5rem', 
-            alignItems: 'center'
-          }}>
-            {[
-              { value: 'all', label: '全部' },
-              { value: 'video', label: '视频' },
-              { value: 'image', label: '图片' }
-            ].map(opt => (
-              <button
-                key={opt.value}
-                onClick={() => setFilter(opt.value)}
-                style={{
-                  padding: '0.5rem 1rem',
-                  background: filter === opt.value ? 'var(--ai-accent-green)' : 'var(--ai-bg-elevated)',
-                  border: 'none',
-                  borderRadius: '6px',
-                  fontSize: '0.875rem',
-                  fontWeight: filter === opt.value ? 600 : 500,
-                  color: filter === opt.value ? '#000' : 'var(--ai-text-secondary)',
-                  cursor: 'pointer',
-                  transition: 'all 0.2s',
-                  whiteSpace: 'nowrap'
-                }}
-              >
-                {opt.label}
-              </button>
-            ))}
-            
-            <div style={{ flex: 1 }} />
-            
-            <Link 
-              to="/generate" 
-              style={{
-                padding: '0.5rem 1.25rem',
-                background: 'linear-gradient(135deg, var(--ai-accent-green), var(--ai-accent-green-hover))',
-                border: 'none',
-                borderRadius: '8px',
-                color: '#000',
-                fontWeight: 600,
-                textDecoration: 'none',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-                boxShadow: '0 2px 8px rgba(74, 222, 128, 0.3)'
-              }}
-            >
-              <Sparkles size={16} />
-              新的生成
-            </Link>
-          </div>
-        </div>
         
         <div style={{
           flex: 1,

@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const axios = require('axios');
 const jwt = require('jsonwebtoken');
+const { Op } = require('sequelize');
 const { User, AiModel, AiGenerateTask, BalanceLog, sequelize } = require('../models');
 const { redis, KEYS, TTL } = require('../config/redis');
 const providerManager = require('../providers');
@@ -417,9 +418,9 @@ router.get('/tasks', async (req, res) => {
   if (type && type !== 'all') {
     const videoModels = ['veo', 'video', 'sora', 'grok'];
     if (type === 'video') {
-      where.modelName = { [require('sequelize').Op.or]: videoModels.map(v => ({ [require('sequelize').Op.like]: `%${v}%` })) };
+      where.modelName = { [Op.or]: videoModels.map(v => ({ [Op.like]: `%${v}%` })) };
     } else if (type === 'image') {
-      where.modelName = { [require('sequelize').Op.not]: { [require('sequelize').Op.or]: videoModels.map(v => ({ [require('sequelize').Op.like]: `%${v}%` })) } };
+      where.modelName = { [Op.not]: { [Op.or]: videoModels.map(v => ({ [Op.like]: `%${v}%` })) } };
     }
   }
   

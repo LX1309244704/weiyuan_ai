@@ -144,9 +144,9 @@ router.get('/users', requireAdmin, async (req, res, next) => {
 
 /**
  * 调整用户余额
- * POST /api/admin/users/:id/balance
+ * POST /api/admin/users/:id/adjust-balance
  */
-router.post('/users/:id/balance', requireAdmin, async (req, res, next) => {
+router.post('/users/:id/adjust-balance', requireAdmin, async (req, res, next) => {
   try {
     const { id } = req.params;
     const { change, reason } = req.body;

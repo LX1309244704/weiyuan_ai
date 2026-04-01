@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../../utils/api'
 import dayjs from 'dayjs'
-import { Search, X, Eye, Download, Play, CheckCircle, XCircle, AlertTriangle, Package } from 'lucide-react'
+import { Search, X, Eye, Download, Play, CheckCircle, XCircle, AlertTriangle, Package, Copy } from 'lucide-react'
 
 const statusConfig = {
   queued: { label: '队列中', color: '#94a3b8', bgColor: 'rgba(148, 163, 184, 0.1)' },
@@ -123,10 +123,48 @@ function TaskDetailModal({ task, onClose }) {
         </div>
       </div>
       
-      <div style={{ marginTop: '1rem' }}>
-        <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>提示词</p>
-        <p style={{ fontSize: '0.875rem', background: '#f8fafc', padding: '0.75rem', borderRadius: '4px' }}>{task.prompt || '-'}</p>
-      </div>
+      {/* 提示词 */}
+      {task.prompt && (
+        <div style={{ marginTop: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500 }}>提示词</p>
+            <button 
+              onClick={() => navigator.clipboard.writeText(task.prompt)}
+              style={{ 
+                display: 'inline-flex', 
+                alignItems: 'center', 
+                gap: '0.25rem',
+                padding: '0.25rem 0.5rem',
+                background: 'transparent',
+                border: '1px solid #e2e8f0',
+                borderRadius: '4px',
+                color: '#64748b',
+                fontSize: '0.75rem',
+                cursor: 'pointer'
+              }}
+              title="复制提示词"
+            >
+              <Copy size={12} /> 复制
+            </button>
+          </div>
+          <div style={{ 
+            background: 'linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%)', 
+            padding: '1rem', 
+            borderRadius: '8px',
+            border: '1px solid #e2e8f0',
+            maxHeight: '300px',
+            overflow: 'auto'
+          }}>
+            <p style={{ 
+              fontSize: '0.875rem', 
+              lineHeight: '1.6', 
+              color: '#334155',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word'
+            }}>{task.prompt}</p>
+          </div>
+        </div>
+      )}
       
       {task.imageUrls && task.imageUrls.length > 0 && (
         <div style={{ marginTop: '1rem' }}>
@@ -267,7 +305,22 @@ export default function InvocationsTab() {
               { 
                 key: 'prompt', 
                 title: '提示词',
-                render: r => <span style={{ fontSize: '0.875rem', color: '#64748b', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.prompt || '-'}</span>
+                render: r => (
+                  <div 
+                    title={r.prompt || '无提示词'} 
+                    style={{ 
+                      maxWidth: '200px', 
+                      overflow: 'hidden', 
+                      textOverflow: 'ellipsis', 
+                      whiteSpace: 'nowrap',
+                      fontSize: '0.875rem', 
+                      color: '#64748b',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {r.prompt || '-'}
+                  </div>
+                )
               },
               { 
                 key: 'status', 

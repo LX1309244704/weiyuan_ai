@@ -189,7 +189,7 @@ router.get('/users/:id', requireAdmin, async (req, res, next) => {
     const { id } = req.params;
     
     const user = await User.findByPk(id, {
-      attributes: ['id', 'username', 'email', 'balance', 'role', 'isActive', 'apiKey', 'totalPurchased', 'created_at']
+      attributes: ['id', 'username', 'email', 'balance', 'role', 'isActive', 'apiKey', 'lastLoginAt', 'created_at']
     });
     
     if (!user) {

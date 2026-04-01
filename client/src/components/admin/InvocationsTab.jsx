@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
 import api from '../../utils/api'
 import dayjs from 'dayjs'
-import { Search, X, Eye, CheckCircle, XCircle, AlertTriangle, Package } from 'lucide-react'
+import { Search, X, Eye, Download, Play, CheckCircle, XCircle, AlertTriangle, Package } from 'lucide-react'
 
 const statusConfig = {
-  success: { label: '成功', color: '#22c55e', bgColor: 'rgba(34, 197, 94, 0.1)' },
-  failed: { label: '失败', color: '#ef4444', bgColor: 'rgba(239, 68, 68, 0.1)' },
-  timeout: { label: '超时', color: '#eab308', bgColor: 'rgba(234, 179, 8, 0.1)' },
+  queued: { label: '队列中', color: '#94a3b8', bgColor: 'rgba(148, 163, 184, 0.1)' },
+  processing: { label: '进行中', color: '#3b82f6', bgColor: 'rgba(59, 130, 246, 0.1)', icon: Play },
+  completed: { label: '已完成', color: '#22c55e', bgColor: 'rgba(34, 197, 94, 0.1)', icon: CheckCircle },
+  failed: { label: '失败', color: '#ef4444', bgColor: 'rgba(239, 68, 68, 0.1)', icon: XCircle },
+  timeout: { label: '超时', color: '#eab308', bgColor: 'rgba(234, 179, 8, 0.1)', icon: AlertTriangle }
 }
 
 function LoadingSpinner() {
@@ -65,7 +67,7 @@ function Table({ columns, data, emptyText }) {
 function Modal({ title, onClose, children }) {
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(0,0,0,0.5)' }} onClick={onClose}>
-      <div style={{ background: 'white', borderRadius: '12px', width: '100%', maxWidth: '800px', maxHeight: '90vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
+      <div style={{ background: 'white', borderRadius: '12px', width: '100%', maxWidth: '900px', maxHeight: '90vh', overflow: 'auto' }} onClick={e => e.stopPropagation()}>
         <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h3 style={{ fontSize: '1rem', fontWeight: 600 }}>{title}</h3>
           <button onClick={onClose} style={{ padding: '0.25rem', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}><X size={20} /></button>
@@ -76,80 +78,81 @@ function Modal({ title, onClose, children }) {
   )
 }
 
-function InvocationDetailModal({ invocation, onClose }) {
-  if (!invocation) return null
+function TaskDetailModal({ task, onClose }) {
+  if (!task) return null
 
-  const status = statusConfig[invocation.status] || { label: invocation.status, color: '#6b7280', bgColor: '#f3f4f6' }
+  const status = statusConfig[task.status] || { label: task.status, color: '#6b7280', bgColor: '#f3f4f6' }
 
   return (
-    <Modal title="调用详情" onClose={onClose}>
+    <Modal title="任务详情" onClose={onClose}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
         <div>
-          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>调用ID</p>
-          <p style={{ fontSize: '0.875rem', fontFamily: 'monospace', wordBreak: 'break-all' }}>{invocation.invocationId}</p>
+          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>任务 ID</p>
+          <p style={{ fontSize: '0.875rem', fontFamily: 'monospace', wordBreak: 'break-all' }}>{task.taskId}</p>
         </div>
         <div>
           <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>状态</p>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 500, background: status.bgColor, color: status.color }}>
+            {status.icon && <status.icon size={12} />}
             {status.label}
           </span>
         </div>
         <div>
           <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>用户</p>
-          <p style={{ fontSize: '0.875rem' }}>{invocation.user?.email || '-'}</p>
+          <p style={{ fontSize: '0.875rem' }}>{task.user?.email || '-'}</p>
         </div>
         <div>
-          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>接口</p>
-          <p style={{ fontSize: '0.875rem' }}>{invocation.endpoint?.name || '-'}</p>
+          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>模型</p>
+          <p style={{ fontSize: '0.875rem', fontWeight: 500 }}>{task.modelName || '-'}</p>
         </div>
         <div>
-          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>请求路径</p>
-          <p style={{ fontSize: '0.875rem', fontFamily: 'monospace' }}>{invocation.requestPath || '-'}</p>
+          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>厂商</p>
+          <p style={{ fontSize: '0.875rem' }}>{task.provider || '-'}</p>
         </div>
         <div>
-          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>响应状态码</p>
-          <p style={{ fontSize: '0.875rem' }}>{invocation.responseCode || '-'}</p>
+          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>进度</p>
+          <p style={{ fontSize: '0.875rem', fontWeight: 500, color: '#3b82f6' }}>{task.progress || 0}%</p>
         </div>
         <div>
-          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>耗时</p>
-          <p style={{ fontSize: '0.875rem' }}>{invocation.latency}ms</p>
+          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>消耗积分</p>
+          <p style={{ fontSize: '0.875rem', fontWeight: 500, color: '#6366f1' }}>{task.cost || 0}</p>
         </div>
         <div>
-          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>费用</p>
-          <p style={{ fontSize: '0.875rem', fontWeight: 500, color: '#6366f1' }}>¥{(invocation.cost / 100).toFixed(2)}</p>
-        </div>
-        <div>
-          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>IP地址</p>
-          <p style={{ fontSize: '0.875rem', fontFamily: 'monospace' }}>{invocation.ipAddress || '-'}</p>
-        </div>
-        <div>
-          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>调用时间</p>
-          <p style={{ fontSize: '0.875rem' }}>{dayjs(invocation.createdAt).format('YYYY-MM-DD HH:mm:ss')}</p>
+          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>创建时间</p>
+          <p style={{ fontSize: '0.875rem' }}>{dayjs(task.createdAt).format('YYYY-MM-DD HH:mm:ss')}</p>
         </div>
       </div>
       
-      {invocation.errorMessage && (
+      <div style={{ marginTop: '1rem' }}>
+        <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>提示词</p>
+        <p style={{ fontSize: '0.875rem', background: '#f8fafc', padding: '0.75rem', borderRadius: '4px' }}>{task.prompt || '-'}</p>
+      </div>
+      
+      {task.imageUrls && task.imageUrls.length > 0 && (
+        <div style={{ marginTop: '1rem' }}>
+          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>参考图片</p>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+            {task.imageUrls.map((url, i) => (
+              <img key={i} src={url} alt={`Reference ${i}`} style={{ width: '100px', height: '100px', objectFit: 'cover', borderRadius: '4px' }} />
+            ))}
+          </div>
+        </div>
+      )}
+      
+      {task.resultUrl && (
+        <div style={{ marginTop: '1rem' }}>
+          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>生成结果</p>
+          <img src={task.resultUrl} alt="Result" style={{ maxWidth: '100%', borderRadius: '8px', marginTop: '0.5rem' }} />
+          <a href={task.resultUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.5rem', color: '#6366f1', fontSize: '0.875rem' }}>
+            <Download size={14} /> 下载结果
+          </a>
+        </div>
+      )}
+      
+      {task.errorMessage && (
         <div style={{ marginTop: '1rem' }}>
           <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>错误信息</p>
-          <p style={{ fontSize: '0.875rem', color: '#ef4444', background: '#fef2f2', padding: '0.5rem', borderRadius: '4px' }}>{invocation.errorMessage}</p>
-        </div>
-      )}
-      
-      {invocation.requestBody && (
-        <div style={{ marginTop: '1rem' }}>
-          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>请求体</p>
-          <pre style={{ fontSize: '0.75rem', background: '#f8fafc', padding: '0.75rem', borderRadius: '4px', overflow: 'auto', maxHeight: '200px' }}>
-            {invocation.requestBody.length > 1000 ? invocation.requestBody.slice(0, 1000) + '...' : invocation.requestBody}
-          </pre>
-        </div>
-      )}
-      
-      {invocation.responseBody && (
-        <div style={{ marginTop: '1rem' }}>
-          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>响应体</p>
-          <pre style={{ fontSize: '0.75rem', background: '#f8fafc', padding: '0.75rem', borderRadius: '4px', overflow: 'auto', maxHeight: '200px' }}>
-            {invocation.responseBody.length > 1000 ? invocation.responseBody.slice(0, 1000) + '...' : invocation.responseBody}
-          </pre>
+          <p style={{ fontSize: '0.875rem', color: '#ef4444', background: '#fef2f2', padding: '0.5rem', borderRadius: '4px' }}>{task.errorMessage}</p>
         </div>
       )}
     </Modal>
@@ -157,40 +160,41 @@ function InvocationDetailModal({ invocation, onClose }) {
 }
 
 export default function InvocationsTab() {
-  const [invocations, setInvocations] = useState([])
+  const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
-  const [selectedInvocation, setSelectedInvocation] = useState(null)
+  const [selectedTask, setSelectedTask] = useState(null)
   
   useEffect(() => {
-    fetchInvocations()
+    fetchTasks()
   }, [page, status])
   
-  const fetchInvocations = async () => {
+  const fetchTasks = async () => {
     setLoading(true)
     try {
       const params = new URLSearchParams()
       params.append('page', page)
-      params.append('limit', '20')
+      params.append('pageSize', '20')
       if (status) params.append('status', status)
       
-      const response = await api.get(`/admin/invocations?${params}`)
-      setInvocations(response.data.invocations || [])
+      const response = await api.get(`/admin/ai-tasks?${params}`)
+      setTasks(response.data.tasks || [])
       setTotalPages(response.data.pagination?.pages || 1)
     } catch (error) {
-      console.error('Failed to fetch invocations:', error)
+      console.error('Failed to fetch tasks:', error)
     } finally {
       setLoading(false)
     }
   }
   
-  const filteredInvocations = invocations.filter(inv => 
-    inv.invocationId?.toLowerCase().includes(search.toLowerCase()) ||
-    inv.user?.email?.toLowerCase().includes(search.toLowerCase()) ||
-    inv.endpoint?.name?.toLowerCase().includes(search.toLowerCase())
+  const filteredTasks = tasks.filter(task => 
+    task.taskId?.toLowerCase().includes(search.toLowerCase()) ||
+    task.user?.email?.toLowerCase().includes(search.toLowerCase()) ||
+    task.modelName?.toLowerCase().includes(search.toLowerCase()) ||
+    task.prompt?.toLowerCase().includes(search.toLowerCase())
   )
   
   const handleStatusFilter = (value) => {
@@ -200,9 +204,10 @@ export default function InvocationsTab() {
   
   const statusFilters = [
     { value: '', label: '全部' },
-    { value: 'success', label: '成功' },
-    { value: 'failed', label: '失败' },
-    { value: 'timeout', label: '超时' }
+    { value: 'queued', label: '队列中' },
+    { value: 'processing', label: '进行中' },
+    { value: 'completed', label: '已完成' },
+    { value: 'failed', label: '失败' }
   ]
   
   return (
@@ -231,7 +236,7 @@ export default function InvocationsTab() {
             </button>
           ))}
         </div>
-        <SearchInput value={search} onChange={setSearch} placeholder="搜索调用ID/用户/接口..." style={{ flex: 1, minWidth: '200px' }} />
+        <SearchInput value={search} onChange={setSearch} placeholder="搜索任务 ID/用户/模型/提示词..." style={{ flex: 1, minWidth: '200px' }} />
       </div>
       
       {/* Table */}
@@ -240,9 +245,9 @@ export default function InvocationsTab() {
           <Table
             columns={[
               { 
-                key: 'invocationId', 
-                title: '调用ID',
-                render: r => <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#64748b' }}>{r.invocationId?.slice(0, 12)}...</span>
+                key: 'taskId', 
+                title: '任务 ID',
+                render: r => <span style={{ fontFamily: 'monospace', fontSize: '0.75rem', color: '#64748b' }}>{r.taskId?.slice(0, 12)}...</span>
               },
               { 
                 key: 'user', 
@@ -250,14 +255,19 @@ export default function InvocationsTab() {
                 render: r => <span style={{ fontSize: '0.875rem' }}>{r.user?.email || '-'}</span>
               },
               { 
-                key: 'endpoint', 
-                title: '接口',
+                key: 'model', 
+                title: '模型',
                 render: r => (
                   <div>
-                    <p style={{ fontWeight: 500, color: '#0f172a' }}>{r.endpoint?.name || '-'}</p>
-                    <p style={{ fontSize: '0.75rem', color: '#94a3b8', fontFamily: 'monospace' }}>{r.requestPath}</p>
+                    <p style={{ fontWeight: 500, color: '#0f172a' }}>{r.modelName || '-'}</p>
+                    <p style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{r.provider || '-'}</p>
                   </div>
                 )
+              },
+              { 
+                key: 'prompt', 
+                title: '提示词',
+                render: r => <span style={{ fontSize: '0.875rem', color: '#64748b', maxWidth: '300px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.prompt || '-'}</span>
               },
               { 
                 key: 'status', 
@@ -265,23 +275,31 @@ export default function InvocationsTab() {
                 render: r => {
                   const s = statusConfig[r.status] || { label: r.status, color: '#6b7280', bgColor: '#f3f4f6' }
                   return (
-                    <span style={{ display: 'inline-flex', padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 500, background: s.bgColor, color: s.color }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.25rem 0.5rem', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 500, background: s.bgColor, color: s.color }}>
+                      {s.icon && <s.icon size={12} />}
                       {s.label}
                     </span>
                   )
                 }
               },
               { 
-                key: 'latency', 
-                title: '耗时',
+                key: 'progress', 
+                title: '进度',
                 align: 'right',
-                render: r => <span style={{ color: '#64748b' }}>{r.latency}ms</span>
+                render: r => (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{ flex: 1, maxWidth: '80px', height: '6px', background: '#f1f5f9', borderRadius: '3px' }}>
+                      <div style={{ width: `${r.progress || 0}%`, height: '100%', background: r.status === 'completed' ? '#22c55e' : r.status === 'failed' ? '#ef4444' : '#3b82f6', borderRadius: '3px' }} />
+                    </div>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{r.progress || 0}%</span>
+                  </div>
+                )
               },
               { 
                 key: 'cost', 
-                title: '费用',
+                title: '积分',
                 align: 'right',
-                render: r => <span style={{ fontWeight: 500, color: '#6366f1' }}>¥{(r.cost / 100).toFixed(2)}</span>
+                render: r => <span style={{ fontWeight: 500, color: '#6366f1' }}>{r.cost || 0}</span>
               },
               { 
                 key: 'createdAt', 
@@ -294,7 +312,7 @@ export default function InvocationsTab() {
                 align: 'right',
                 render: r => (
                   <button 
-                    onClick={() => setSelectedInvocation(r)}
+                    onClick={() => setSelectedTask(r)}
                     style={{ padding: '0.25rem', background: 'none', border: 'none', cursor: 'pointer', color: '#6366f1' }}
                     title="查看详情"
                   >
@@ -303,8 +321,8 @@ export default function InvocationsTab() {
                 )
               }
             ]}
-            data={filteredInvocations}
-            emptyText="暂无调用记录"
+            data={filteredTasks}
+            emptyText="暂无 AI 生成任务"
           />
         )}
       </div>
@@ -350,10 +368,10 @@ export default function InvocationsTab() {
         </div>
       )}
 
-      {selectedInvocation && (
-        <InvocationDetailModal
-          invocation={selectedInvocation}
-          onClose={() => setSelectedInvocation(null)}
+      {selectedTask && (
+        <TaskDetailModal
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
         />
       )}
     </div>

@@ -78,6 +78,14 @@ function Modal({ title, onClose, children }) {
   )
 }
 
+/**
+ * 判断是否为视频 URL
+ */
+function isVideoUrl(url) {
+  const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.avi', '.mkv']
+  return videoExtensions.some(ext => url.toLowerCase().includes(ext))
+}
+
 function TaskDetailModal({ task, onClose }) {
   if (!task) return null
 
@@ -177,13 +185,49 @@ function TaskDetailModal({ task, onClose }) {
         </div>
       )}
       
+      {/* 生成结果 */}
       {task.resultUrl && (
         <div style={{ marginTop: '1rem' }}>
-          <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>生成结果</p>
-          <img src={task.resultUrl} alt="Result" style={{ maxWidth: '100%', borderRadius: '8px', marginTop: '0.5rem' }} />
-          <a href={task.resultUrl} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', marginTop: '0.5rem', color: '#6366f1', fontSize: '0.875rem' }}>
-            <Download size={14} /> 下载结果
-          </a>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+            <p style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: 500 }}>生成结果</p>
+            <a 
+              href={task.resultUrl} 
+              target="_blank" 
+              rel="noreferrer"
+              style={{ 
+                display: 'inline-flex', 
+                alignItems: 'center', 
+                gap: '0.25rem',
+                padding: '0.25rem 0.5rem',
+                background: '#6366f1',
+                border: 'none',
+                borderRadius: '4px',
+                color: 'white',
+                fontSize: '0.75rem',
+                cursor: 'pointer',
+                textDecoration: 'none'
+              }}
+            >
+              <Download size={12} /> 下载
+            </a>
+          </div>
+          
+          {/* 判断是否为视频 */}
+          {isVideoUrl(task.resultUrl) ? (
+            <video 
+              controls 
+              style={{ width: '100%', maxWidth: '600px', borderRadius: '8px', background: '#000', marginTop: '0.5rem' }}
+            >
+              <source src={task.resultUrl} type="video/mp4" />
+              您的浏览器不支持视频播放
+            </video>
+          ) : (
+            <img 
+              src={task.resultUrl} 
+              alt="Result" 
+              style={{ maxWidth: '100%', borderRadius: '8px', marginTop: '0.5rem' }} 
+            />
+          )}
         </div>
       )}
       

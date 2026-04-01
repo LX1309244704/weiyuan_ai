@@ -155,6 +155,17 @@ function GenerateHistory() {
     return url.includes('.mp4') || url.includes('.webm') || model.includes('veo') || model.includes('video') || model.includes('grok') || model.includes('sora')
   }
   
+  const getModelDisplayName = (modelId) => {
+    const modelNames = {
+      'runninghub/nanobanana': '香蕉 Pro',
+      'runninghub/bananaflash': '香蕉 Flash',
+      'runninghub/veo31': 'VEO3.1 视频生成',
+      'runninghub/sora2': 'Sora2 视频生成',
+      'huoshan/image': '火山图片'
+    }
+    return modelNames[modelId] || modelId?.split('/')?.pop() || modelId || '未知模型'
+  }
+  
   const getStatusBadge = (status) => {
     switch (status) {
       case 'completed':

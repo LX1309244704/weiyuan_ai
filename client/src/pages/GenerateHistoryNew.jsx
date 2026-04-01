@@ -255,12 +255,6 @@ function GenerateHistory() {
             overflow: 'auto'
           }}
         >
-        
-        <div style={{
-          flex: 1,
-          padding: '2rem',
-          overflow: 'auto'
-        }}>
           {loading ? (
             <div style={{
               display: 'flex',
@@ -619,6 +613,7 @@ function GenerateHistory() {
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }

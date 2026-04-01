@@ -5,7 +5,7 @@ import api from '../utils/api'
 import { 
   Image, Video, Clock, Download, 
   Calendar, Zap, ArrowLeft, Trash2, Sparkles, 
-  CheckCircle, XCircle, Loader2, X
+  CheckCircle, XCircle, Loader2, X, ChevronLeft, ChevronRight
 } from 'lucide-react'
 import dayjs from 'dayjs'
 import TopNavigationBar from '../components/TopNavigationBar'
@@ -490,6 +490,74 @@ function GenerateHistory() {
             </div>
           )}
         </div>
+        
+        {/* 分页控件 */}
+        {filteredHistory.length > 0 && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+            padding: '2rem',
+            borderTop: '1px solid var(--ai-border-color)'
+          }}>
+            <button
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+                padding: '0.5rem 1rem',
+                background: page === 1 ? 'var(--ai-bg-secondary)' : 'var(--ai-accent-green)',
+                border: 'none',
+                borderRadius: '6px',
+                color: page === 1 ? 'var(--ai-text-muted)' : '#000',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                cursor: page === 1 ? 'not-allowed' : 'pointer',
+                opacity: page === 1 ? 0.5 : 1,
+                transition: 'all 0.2s'
+              }}
+            >
+              <ChevronLeft size={16} />
+              上一页
+            </button>
+            
+            <span style={{
+              fontSize: '0.875rem',
+              color: 'var(--ai-text-secondary)',
+              padding: '0 1rem',
+              minWidth: '120px',
+              textAlign: 'center'
+            }}>
+              第 {page} 页 / 共 {Math.ceil(total / 10)} 页 ({total} 条记录)
+            </span>
+            
+            <button
+              onClick={() => setPage(p => Math.min(Math.ceil(total / 10), p + 1))}
+              disabled={page >= Math.ceil(total / 10)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+                padding: '0.5rem 1rem',
+                background: page >= Math.ceil(total / 10) ? 'var(--ai-bg-secondary)' : 'var(--ai-accent-green)',
+                border: 'none',
+                borderRadius: '6px',
+                color: page >= Math.ceil(total / 10) ? 'var(--ai-text-muted)' : '#000',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                cursor: page >= Math.ceil(total / 10) ? 'not-allowed' : 'pointer',
+                opacity: page >= Math.ceil(total / 10) ? 0.5 : 1,
+                transition: 'all 0.2s'
+              }}
+            >
+              下一页
+              <ChevronRight size={16} />
+            </button>
+          </div>
+        )}
       </div>
 
       {previewItem && (

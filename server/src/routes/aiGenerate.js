@@ -418,9 +418,10 @@ router.get('/tasks', async (req, res) => {
   if (type && type !== 'all') {
     const videoModels = ['veo', 'video', 'sora', 'grok'];
     if (type === 'video') {
-      where.modelName = { [Op.or]: videoModels.map(v => ({ [Op.like]: `%${v}%` })) };
+      where[Op.or] = videoModels.map(v => ({ modelName: { [Op.like]: `%${v}%` } }));
     } else if (type === 'image') {
-      where.modelName = { [Op.not]: { [Op.or]: videoModels.map(v => ({ [Op.like]: `%${v}%` })) } };
+      // 图片类型：排除视频模型
+      where[Op.and] = videoModels.map(v => ({ modelName: { [Op.notLike]: `%${v}%` } }));
     }
   }
   

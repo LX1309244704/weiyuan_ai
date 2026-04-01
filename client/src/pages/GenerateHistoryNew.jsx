@@ -5,7 +5,7 @@ import api from '../utils/api'
 import { 
   Image, Video, Clock, Download, 
   Calendar, Zap, ArrowLeft, Trash2, Sparkles, 
-  CheckCircle, XCircle, Loader2, X, ChevronLeft, ChevronRight
+  CheckCircle, XCircle, Loader2, X, RefreshCw
 } from 'lucide-react'
 import dayjs from 'dayjs'
 import TopNavigationBar from '../components/TopNavigationBar'
@@ -22,6 +22,8 @@ function GenerateHistory() {
   const [total, setTotal] = useState(0)
   const [userApiKey, setUserApiKey] = useState('')
   const [previewItem, setPreviewItem] = useState(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
   
   useEffect(() => {
     if (!isAuthenticated) {
@@ -33,9 +35,10 @@ function GenerateHistory() {
   
   useEffect(() => {
     if (userApiKey) {
+      setPage(1)
       fetchHistory()
     }
-  }, [userApiKey, filter, typeFilter, page])
+  }, [userApiKey, filter, typeFilter])
 
   const handleDeleteTask = async (taskId) => {
     if (!confirm('确定要删除这条记录吗？')) return
@@ -79,11 +82,40 @@ function GenerateHistory() {
       if (res.data.success) {
         setHistory(res.data.tasks || [])
         setTotal(res.data.total || 0)
+        const totalPages = Math.ceil(res.data.total / 10)
+        setHasMore(page < totalPages)
       }
     } catch (err) {
       console.error('Failed to fetch history:', err)
     } finally {
       setLoading(false)
+    }
+  }
+  
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    try {
+      const nextPage = page + 1
+      const res = await api.get('/ai-generate/tasks', {
+        params: {
+          status: filter === 'all' ? undefined : filter,
+          type: typeFilter,
+          page: nextPage,
+          pageSize: 10
+        },
+        headers: { 'X-API-Key': userApiKey }
+      })
+      if (res.data.success) {
+        setHistory(prev => [...prev, ...(res.data.tasks || [])])
+        setPage(nextPage)
+        const totalPages = Math.ceil(res.data.total / 10)
+        setHasMore(nextPage < totalPages)
+      }
+    } catch (err) {
+      console.error('Failed to load more:', err)
+    } finally {
+      setLoadingMore(false)
     }
   }
   
@@ -491,71 +523,59 @@ function GenerateHistory() {
           )}
         </div>
         
-        {/* 分页控件 */}
-        {filteredHistory.length > 0 && (
+        {/* 加载更多 */}
+        {hasMore && (
           <div style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '0.5rem',
             padding: '2rem',
             borderTop: '1px solid var(--ai-border-color)'
           }}>
             <button
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-              disabled={page === 1}
+              onClick={loadMore}
+              disabled={loadingMore}
               style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '0.25rem',
-                padding: '0.5rem 1rem',
-                background: page === 1 ? 'var(--ai-bg-secondary)' : 'var(--ai-accent-green)',
+                gap: '0.5rem',
+                padding: '0.75rem 2rem',
+                background: loadingMore ? 'var(--ai-bg-secondary)' : 'linear-gradient(135deg, var(--ai-accent-green), var(--ai-accent-green-hover))',
                 border: 'none',
-                borderRadius: '6px',
-                color: page === 1 ? 'var(--ai-text-muted)' : '#000',
+                borderRadius: '8px',
+                color: loadingMore ? 'var(--ai-text-muted)' : '#000',
                 fontSize: '0.875rem',
-                fontWeight: 500,
-                cursor: page === 1 ? 'not-allowed' : 'pointer',
-                opacity: page === 1 ? 0.5 : 1,
+                fontWeight: 600,
+                cursor: loadingMore ? 'not-allowed' : 'pointer',
+                opacity: loadingMore ? 0.5 : 1,
                 transition: 'all 0.2s'
               }}
             >
-              <ChevronLeft size={16} />
-              上一页
+              {loadingMore ? (
+                <>
+                  <Loader2 size={16} className="ai-spin" />
+                  加载中...
+                </>
+              ) : (
+                <>
+                  <RefreshCw size={16} />
+                  加载更多
+                </>
+              )}
             </button>
-            
-            <span style={{
-              fontSize: '0.875rem',
-              color: 'var(--ai-text-secondary)',
-              padding: '0 1rem',
-              minWidth: '120px',
-              textAlign: 'center'
-            }}>
-              第 {page} 页 / 共 {Math.ceil(total / 10)} 页 ({total} 条记录)
-            </span>
-            
-            <button
-              onClick={() => setPage(p => Math.min(Math.ceil(total / 10), p + 1))}
-              disabled={page >= Math.ceil(total / 10)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.25rem',
-                padding: '0.5rem 1rem',
-                background: page >= Math.ceil(total / 10) ? 'var(--ai-bg-secondary)' : 'var(--ai-accent-green)',
-                border: 'none',
-                borderRadius: '6px',
-                color: page >= Math.ceil(total / 10) ? 'var(--ai-text-muted)' : '#000',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                cursor: page >= Math.ceil(total / 10) ? 'not-allowed' : 'pointer',
-                opacity: page >= Math.ceil(total / 10) ? 0.5 : 1,
-                transition: 'all 0.2s'
-              }}
-            >
-              下一页
-              <ChevronRight size={16} />
-            </button>
+          </div>
+        )}
+        
+        {/* 没有更多数据 */}
+        {!hasMore && filteredHistory.length > 0 && (
+          <div style={{
+            textAlign: 'center',
+            padding: '2rem',
+            color: 'var(--ai-text-muted)',
+            fontSize: '0.875rem',
+            borderTop: '1px solid var(--ai-border-color)'
+          }}>
+            已加载全部 {total} 条记录
           </div>
         )}
       </div>

@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../context/AuthContext'
 import api from '../utils/api'
 import { 
   Image, Video, Clock, Download, 
   Calendar, Zap, ArrowLeft, Trash2, Sparkles, 
-  CheckCircle, XCircle, Loader2, X, RefreshCw
+  CheckCircle, XCircle, Loader2, X
 } from 'lucide-react'
 import dayjs from 'dayjs'
 import TopNavigationBar from '../components/TopNavigationBar'
@@ -24,6 +24,8 @@ function GenerateHistory() {
   const [previewItem, setPreviewItem] = useState(null)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
+  
+  const listContainerRef = useRef(null)
   
   useEffect(() => {
     if (!isAuthenticated) {
@@ -119,6 +121,23 @@ function GenerateHistory() {
     }
   }
   
+  // 监听滚动，自动加载更多
+  useEffect(() => {
+    const container = listContainerRef.current
+    if (!container) return
+    
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container
+      // 距离底部还有 200px 时加载
+      if (scrollHeight - scrollTop - clientHeight < 200 && hasMore && !loadingMore) {
+        loadMore()
+      }
+    }
+    
+    container.addEventListener('scroll', handleScroll)
+    return () => container.removeEventListener('scroll', handleScroll)
+  }, [hasMore, loadingMore, page, filter, typeFilter, userApiKey])
+  
   const handleDownload = (url) => {
     if (!url) return
     const link = document.createElement('a')
@@ -197,12 +216,14 @@ function GenerateHistory() {
     }}>
       <TopNavigationBar title="Weiyuan AI" />
       
-      <div style={{
-        flex: 1,
-        overflow: 'auto',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
+        <div
+          ref={listContainerRef}
+          style={{
+            flex: 1,
+            padding: '2rem',
+            overflow: 'auto'
+          }}
+        >
         <div style={{ 
           padding: '1.5rem 2rem',
           borderBottom: '1px solid var(--ai-border-color)',
@@ -523,46 +544,17 @@ function GenerateHistory() {
           )}
         </div>
         
-        {/* 加载更多 */}
-        {hasMore && (
+        {/* 加载状态提示 */}
+        {loadingMore && (
           <div style={{
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             padding: '2rem',
-            borderTop: '1px solid var(--ai-border-color)'
+            color: 'var(--ai-text-secondary)'
           }}>
-            <button
-              onClick={loadMore}
-              disabled={loadingMore}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '0.5rem',
-                padding: '0.75rem 2rem',
-                background: loadingMore ? 'var(--ai-bg-secondary)' : 'linear-gradient(135deg, var(--ai-accent-green), var(--ai-accent-green-hover))',
-                border: 'none',
-                borderRadius: '8px',
-                color: loadingMore ? 'var(--ai-text-muted)' : '#000',
-                fontSize: '0.875rem',
-                fontWeight: 600,
-                cursor: loadingMore ? 'not-allowed' : 'pointer',
-                opacity: loadingMore ? 0.5 : 1,
-                transition: 'all 0.2s'
-              }}
-            >
-              {loadingMore ? (
-                <>
-                  <Loader2 size={16} className="ai-spin" />
-                  加载中...
-                </>
-              ) : (
-                <>
-                  <RefreshCw size={16} />
-                  加载更多
-                </>
-              )}
-            </button>
+            <Loader2 size={20} className="ai-spin" style={{ marginRight: '0.5rem' }} />
+            加载中...
           </div>
         )}
         

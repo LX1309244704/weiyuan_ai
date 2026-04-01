@@ -16,7 +16,6 @@ function GenerateHistory() {
   const { isAuthenticated } = useAuthStore()
   const [history, setHistory] = useState([])
   const [loading, setLoading] = useState(true)
-  const [typeFilter, setTypeFilter] = useState('all')
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [userApiKey, setUserApiKey] = useState('')
@@ -37,9 +36,10 @@ function GenerateHistory() {
   useEffect(() => {
     if (userApiKey) {
       setPage(1)
+      setHistory([])
       fetchHistory()
     }
-  }, [userApiKey, filter, typeFilter])
+  }, [userApiKey])
 
   const handleDeleteTask = async (taskId) => {
     if (!confirm('确定要删除这条记录吗？')) return
@@ -73,9 +73,7 @@ function GenerateHistory() {
     try {
       const res = await api.get('/ai-generate/tasks', {
         params: {
-          status: 'all',
-          type: typeFilter,
-          page,
+          page: 1,
           pageSize: 10
         },
         headers: { 'X-API-Key': userApiKey }
@@ -84,7 +82,7 @@ function GenerateHistory() {
         setHistory(res.data.tasks || [])
         setTotal(res.data.total || 0)
         const totalPages = Math.ceil(res.data.total / 10)
-        setHasMore(page < totalPages)
+        setHasMore(1 < totalPages)
       }
     } catch (err) {
       console.error('Failed to fetch history:', err)
@@ -100,8 +98,6 @@ function GenerateHistory() {
       const nextPage = page + 1
       const res = await api.get('/ai-generate/tasks', {
         params: {
-          status: 'all',
-          type: typeFilter,
           page: nextPage,
           pageSize: 10
         },
@@ -127,6 +123,7 @@ function GenerateHistory() {
     
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = container
+      // 距离底部还有 200px 时加载
       if (scrollHeight - scrollTop - clientHeight < 200 && hasMore && !loadingMore) {
         loadMore()
       }
@@ -134,7 +131,7 @@ function GenerateHistory() {
     
     container.addEventListener('scroll', handleScroll)
     return () => container.removeEventListener('scroll', handleScroll)
-  }, [hasMore, loadingMore, page, typeFilter, userApiKey])
+  }, [hasMore, loadingMore, page, userApiKey])
   
   const handleDownload = (url) => {
     if (!url) return
@@ -198,7 +195,10 @@ function GenerateHistory() {
     }
   }
   
-  const filteredHistory = history
+  const filteredHistory = history.filter(item => {
+    if (filter === 'all') return true
+    return item.type === filter || (item.modelName?.toLowerCase().includes('video') ? 'video' : 'image') === filter
+  })
   
   return (
     <div style={{ 
@@ -211,12 +211,15 @@ function GenerateHistory() {
     }}>
       <TopNavigationBar title="Weiyuan AI" />
       
-      <div style={{
-        flex: 1,
-        overflow: 'auto',
-        display: 'flex',
-        flexDirection: 'column'
-      }}>
+        <div
+          ref={listContainerRef}
+          style={{
+            flex: 1,
+            padding: '2rem',
+            overflow: 'auto'
+          }}
+>
+        {/* 顶部工具栏 */}
         <div style={{ 
           padding: '1.5rem 2rem',
           borderBottom: '1px solid var(--ai-border-color)',
@@ -247,14 +250,11 @@ function GenerateHistory() {
           </Link>
         </div>
         
-        <div
-          ref={listContainerRef}
-          style={{
-            flex: 1,
-            padding: '2rem',
-            overflow: 'auto'
-          }}
-        >
+        <div style={{
+          flex: 1,
+          padding: '2rem',
+          overflow: 'auto'
+        }}>
           {loading ? (
             <div style={{
               display: 'flex',
@@ -269,7 +269,7 @@ function GenerateHistory() {
               </div>
               <p>加载中...</p>
             </div>
-          ) : filteredHistory.length === 0 ? (
+          ) : history.length === 0 ? (
             <div style={{
               display: 'flex',
               flexDirection: 'column',
@@ -303,7 +303,7 @@ function GenerateHistory() {
               gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
               gap: '1.5rem'
             }}>
-              {filteredHistory.map((item) => {
+              {history.map((item) => {
                 const statusBadge = getStatusBadge(item.status)
                 const itemIsVideo = isVideo(item)
                 
@@ -524,7 +524,7 @@ function GenerateHistory() {
         )}
         
         {/* 没有更多数据 */}
-        {!hasMore && filteredHistory.length > 0 && (
+        {!hasMore && history.length > 0 && (
           <div style={{
             textAlign: 'center',
             padding: '2rem',
@@ -613,7 +613,6 @@ function GenerateHistory() {
           </div>
         </div>
       )}
-      </div>
     </div>
   )
 }

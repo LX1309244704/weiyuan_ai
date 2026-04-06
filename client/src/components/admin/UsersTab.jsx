@@ -1,12 +1,28 @@
 import { useState, useEffect } from 'react'
 import api from '../../utils/api'
 import dayjs from 'dayjs'
-import { Search, Eye, UserPlus, UserMinus, Users, Shield, Package, Zap, X } from 'lucide-react'
+import { Search, Eye, Users, Shield, Copy } from 'lucide-react'
+
+function SearchInput({ value, onChange, placeholder }) {
+  return (
+    <div style={{ position: 'relative', flex: 1 }}>
+      <Search size={18} style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+      <input
+        type="text"
+        className="input"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        style={{ paddingLeft: '2.5rem', width: '100%' }}
+      />
+    </div>
+  )
+}
 
 function UserDetailModal({ user, onClose, onAdjustBalance }) {
   const [userDetail, setUserDetail] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [adjustAmount, setAdjustAmount] = useState(0)
+  const [adjustAmount, setAdjustAmount] = useState('')
   const [adjusting, setAdjusting] = useState(false)
   
   useEffect(() => {
@@ -28,7 +44,7 @@ function UserDetailModal({ user, onClose, onAdjustBalance }) {
   }
   
   const handleAdjust = async () => {
-    if (adjustAmount === 0) {
+    if (!adjustAmount || parseInt(adjustAmount) === 0) {
       alert('请输入调整数量')
       return
     }
@@ -36,7 +52,7 @@ function UserDetailModal({ user, onClose, onAdjustBalance }) {
     setAdjusting(true)
     try {
       await onAdjustBalance(user.id, parseInt(adjustAmount))
-      setAdjustAmount(0)
+      setAdjustAmount('')
       fetchUserDetail()
     } catch (error) {
       alert('调整失败: ' + (error.response?.data?.error || error.message))
@@ -45,145 +61,150 @@ function UserDetailModal({ user, onClose, onAdjustBalance }) {
     }
   }
   
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text)
+    alert('已复制到剪贴板')
+  }
+  
   if (!user) return null
   
+  const userData = userDetail?.user || {}
+  
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-6 border-b border-gray-200 sticky top-0 bg-white">
-          <h3 className="text-lg font-semibold text-gray-900">用户详情</h3>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
-            <X className="w-5 h-5 text-gray-500" />
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'rgba(0,0,0,0.5)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 1000
+    }} onClick={onClose}>
+      <div style={{
+        background: '#fff',
+        borderRadius: '12px',
+        padding: '2rem',
+        width: '500px',
+        maxWidth: '90%',
+        maxHeight: '90vh',
+        overflowY: 'auto'
+      }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 600 }}>用户详情</h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
           </button>
         </div>
         
         {loading ? (
-          <div className="p-6">
-            <div className="animate-pulse space-y-4">
-              <div className="h-4 bg-gray-200 rounded w-1/4" />
-              <div className="h-20 bg-gray-200 rounded" />
-            </div>
-          </div>
-        ) : userDetail ? (
-          <div className="p-6 space-y-6">
-            {/* User Info */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="p-4 bg-gray-50 rounded-xl">
-                <p className="text-sm text-gray-500 mb-1">邮箱</p>
-                <p className="font-medium text-gray-900">{userDetail.user?.email}</p>
+          <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>加载中...</div>
+        ) : (
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '1.5rem', background: '#f8fafc', borderRadius: '10px', marginBottom: '1.5rem' }}>
+              <div style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white',
+                fontSize: '1.5rem',
+                fontWeight: 700
+              }}>
+                {userData.email?.charAt(0).toUpperCase()}
               </div>
-              <div className="p-4 bg-gray-50 rounded-xl">
-                <p className="text-sm text-gray-500 mb-1">昵称</p>
-                <p className="font-medium text-gray-900">{userDetail.user?.name || '-'}</p>
-              </div>
-              <div className="p-4 bg-blue-50 rounded-xl">
-                <p className="text-sm text-blue-600 mb-1">余额</p>
-                <p className="text-2xl font-bold text-blue-600">{userDetail.user?.balance} 积分</p>
-              </div>
-              <div className="p-4 bg-green-50 rounded-xl">
-                <p className="text-sm text-green-600 mb-1">累计购买</p>
-                <p className="text-2xl font-bold text-green-600">{userDetail.user?.totalPurchased}</p>
+              <div>
+                <p style={{ fontSize: '1.25rem', fontWeight: 600, margin: 0 }}>{userData.username || '-'}</p>
+                <p style={{ color: '#64748b', margin: 0 }}>{userData.email}</p>
               </div>
             </div>
             
-            {/* API Key */}
-            <div className="p-4 bg-gray-50 rounded-xl">
-              <p className="text-sm text-gray-500 mb-2">API Key</p>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-lg font-mono text-xs break-all">
-                  {userDetail.user?.apiKey}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div style={{ padding: '1rem', background: '#f0f9ff', borderRadius: '10px' }}>
+                <p style={{ fontSize: '0.875rem', color: '#64748b', margin: '0 0 0.5rem 0' }}>账户余额</p>
+                <p style={{ fontSize: '1.5rem', fontWeight: 700, color: '#6366f1', margin: 0 }}>{userData.balance} 积分</p>
+              </div>
+              <div style={{ padding: '1rem', background: '#f3f4f6', borderRadius: '10px' }}>
+                <p style={{ fontSize: '0.875rem', color: '#64748b', margin: '0 0 0.5rem 0' }}>角色权限</p>
+                <p style={{ fontSize: '1rem', fontWeight: 600, margin: 0 }}>
+                  <span style={{ 
+                    padding: '0.25rem 0.75rem', 
+                    borderRadius: '9999px', 
+                    fontSize: '0.75rem',
+                    background: userData.role === 'admin' ? '#f3f4f6' : '#e5e7eb',
+                    color: userData.role === 'admin' ? '#6366f1' : '#6b7280'
+                  }}>
+                    {userData.role === 'admin' ? '管理员' : '普通用户'}
+                  </span>
+                </p>
+              </div>
+            </div>
+            
+            <div style={{ marginBottom: '1.5rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', color: '#64748b', fontWeight: 500 }}>API Key</label>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <code style={{ flex: 1, padding: '0.75rem', background: '#f8fafc', borderRadius: '8px', fontSize: '0.875rem', fontFamily: 'monospace', wordBreak: 'break-all' }}>
+                  {userData.apiKey || '未生成'}
                 </code>
-                <button 
-                  onClick={() => navigator.clipboard.writeText(userDetail.user?.apiKey)}
-                  className="px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                <button
+                  onClick={() => userData.apiKey && copyToClipboard(userData.apiKey)}
+                  disabled={!userData.apiKey}
+                  style={{
+                    padding: '0.75rem',
+                    background: userData.apiKey ? '#f1f5f9' : '#e2e8f0',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: userData.apiKey ? 'pointer' : 'not-allowed',
+                    color: userData.apiKey ? '#64748b' : '#94a3b8'
+                  }}
                 >
-                  复制
+                  <Copy size={16} />
                 </button>
               </div>
             </div>
             
-            {/* Adjust Balance */}
-            <div className="p-4 border border-gray-200 rounded-xl">
-              <p className="text-sm font-medium text-gray-700 mb-3">调整余额</p>
-              <div className="flex items-center gap-3">
+            <div style={{ padding: '1.5rem', background: '#f8fafc', borderRadius: '10px' }}>
+              <p style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>调整余额</p>
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
                 <input
                   type="number"
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   value={adjustAmount}
-                  onChange={e => setAdjustAmount(e.target.value)}
+                  onChange={(e) => setAdjustAmount(e.target.value)}
                   placeholder="正数增加，负数减少"
+                  style={{
+                    flex: 1,
+                    padding: '0.75rem',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    fontSize: '1rem'
+                  }}
                 />
                 <button
                   onClick={handleAdjust}
                   disabled={adjusting}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-2"
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: '#22c55e',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: adjusting ? 'not-allowed' : 'pointer',
+                    fontWeight: 600
+                  }}
                 >
-                  {adjusting ? '调整中...' : <>确认</>}
+                  {adjusting ? '处理中...' : '确认调整'}
                 </button>
               </div>
-              <p className="text-xs text-gray-500 mt-2">正数增加余额，负数减少余额</p>
-            </div>
-            
-            {/* Recent Orders */}
-            <div>
-              <p className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
-                <Package className="w-4 h-4" /> 最近订单
-              </p>
-              {userDetail.recentOrders?.length > 0 ? (
-                <div className="space-y-2">
-                  {userDetail.recentOrders.map(order => (
-                    <div key={order.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <p className="text-xs font-mono text-gray-600">{order.orderNo?.substring(0, 16)}...</p>
-                        <p className="text-xs text-gray-500">{dayjs(order.createdAt).format('MM-DD HH:mm')}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-green-600">¥{order.amount / 100}</p>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          order.status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {order.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">暂无订单</p>
-              )}
-            </div>
-            
-            {/* Recent Invocations */}
-            <div>
-              <p className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
-                <Zap className="w-4 h-4" /> 最近调用
-              </p>
-              {userDetail.recentInvocations?.length > 0 ? (
-                <div className="space-y-2">
-                  {userDetail.recentInvocations.map(inv => (
-                    <div key={inv.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <p className="text-sm text-gray-900">{inv.skill?.name || 'Unknown'}</p>
-                        <p className="text-xs text-gray-500">{dayjs(inv.createdAt).format('MM-DD HH:mm')}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium text-red-600">-{inv.cost}</p>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          inv.status === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                        }`}>
-                          {inv.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-gray-500">暂无调用记录</p>
-              )}
+              <p style={{ fontSize: '0.875rem', color: '#64748b', margin: 0 }}>正数增加余额，负数减少余额</p>
             </div>
           </div>
-        ) : (
-          <div className="p-6 text-center text-gray-500">加载失败</div>
         )}
       </div>
     </div>
@@ -195,105 +216,134 @@ export default function UsersTab() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selectedUser, setSelectedUser] = useState(null)
+  const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
   
   useEffect(() => {
     fetchUsers()
-  }, [])
-  
+  }, [page, search])
+    
   const fetchUsers = async () => {
+    setLoading(true)
     try {
-      const response = await api.get('/admin/users?limit=100')
+      const params = { page, pageSize: 20 }
+      if (search) params.keyword = search
+      const response = await api.get('/admin/users', { params })
       setUsers(response.data.users || [])
+      setTotalPages(response.data.pagination?.pages || 1)
     } catch (error) {
       console.error('Failed to fetch users:', error)
     } finally {
       setLoading(false)
     }
   }
-  
+    
   const handleAdjustBalance = async (userId, amount) => {
-    await api.post(`/admin/users/${userId}/adjust-balance`, {
-      amount,
-      reason: '管理员手动调整'
-    })
-    alert('调整成功')
-    fetchUsers()
+    try {
+      await api.post(`/admin/users/${userId}/adjust-balance`, {
+        change: amount,
+        reason: '管理员手动调整'
+      })
+      alert('调整成功')
+      fetchUsers()
+    } catch (error) {
+      alert('调整失败: ' + (error.response?.data?.error || error.message))
+    }
   }
-  
-  const filteredUsers = users.filter(u => 
-    u.email?.toLowerCase().includes(search.toLowerCase()) ||
-    u.name?.toLowerCase().includes(search.toLowerCase())
-  )
-  
+    
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text)
+    alert('已复制到剪贴板')
+  }
+    
   return (
     <div>
-      {/* Search */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="搜索用户邮箱/昵称..."
-            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
-        </div>
-        <div className="text-sm text-gray-500">
-          共 {filteredUsers.length} 用户
-        </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <h2 style={{ fontSize: '1.5rem', fontWeight: 600 }}>用户管理</h2>
       </div>
       
-      {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
+      <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem' }}>
+        <SearchInput value={search} onChange={(e) => { setSearch(e); setPage(1) }} placeholder="搜索用户邮箱/昵称..." style={{ flex: 1, minWidth: '200px' }} />
+        <span style={{ color: '#64748b', fontSize: '1rem' }}>
+          共 {users.length} 位用户
+        </span>
+      </div>
+      
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>加载中...</div>
+      ) : users.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
+          暂无用户数据
+        </div>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
-              <tr className="bg-gray-50 border-b border-gray-200">
-                <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">用户</th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">余额</th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">累计购买</th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">角色</th>
-                <th className="text-left px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">注册时间</th>
-                <th className="text-right px-6 py-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">操作</th>
+              <tr style={{ borderBottom: '2px solid #e2e8f0' }}>
+                <th style={{ textAlign: 'left', padding: '1rem', color: '#64748b', fontWeight: 500 }}>用户信息</th>
+                <th style={{ textAlign: 'left', padding: '1rem', color: '#64748b', fontWeight: 500 }}>余额积分</th>
+                <th style={{ textAlign: 'left', padding: '1rem', color: '#64748b', fontWeight: 500 }}>累计购买</th>
+                <th style={{ textAlign: 'left', padding: '1rem', color: '#64748b', fontWeight: 500 }}>角色权限</th>
+                <th style={{ textAlign: 'left', padding: '1rem', color: '#64748b', fontWeight: 500 }}>注册时间</th>
+                <th style={{ textAlign: 'left', padding: '1rem', color: '#64748b', fontWeight: 500 }}>操作</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredUsers.map((u) => (
-                <tr key={u.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-medium">
+            <tbody>
+              {users.map((u) => (
+                <tr key={u.id} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                  <td style={{ padding: '1rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                      <div style={{
+                        width: '40px',
+                        height: '40px',
+                        borderRadius: '8px',
+                        background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        fontWeight: 600
+                      }}>
                         {u.email?.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <p className="font-medium text-gray-900">{u.name || '-'}</p>
-                        <p className="text-sm text-gray-500">{u.email}</p>
+                        <p style={{ fontWeight: 600, margin: 0 }}>{u.username || '-'}</p>
+                        <p style={{ color: '#64748b', fontSize: '0.875rem', margin: 0 }}>{u.email}</p>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm font-semibold text-blue-600">{u.balance}</span>
-                    <span className="text-xs text-gray-500 ml-1">积分</span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{u.totalPurchased}</td>
-                  <td className="px-6 py-4">
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      u.role === 'admin' 
-                        ? 'bg-purple-100 text-purple-700' 
-                        : 'bg-gray-100 text-gray-600'
-                    }`}>
-                      {u.role === 'admin' ? <Shield className="w-3 h-3" /> : <Users className="w-3 h-3" />}
+                  <td style={{ padding: '1rem', fontWeight: 600, color: '#6366f1' }}>{u.balance}</td>
+                  <td style={{ padding: '1rem', color: '#64748b' }}>{u.totalPurchased || 0}</td>
+                  <td style={{ padding: '1rem' }}>
+                    <span style={{
+                      padding: '0.25rem 0.75rem',
+                      borderRadius: '9999px',
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      background: u.role === 'admin' ? 'rgba(99, 102, 241, 0.1)' : 'rgba(100, 116, 139, 0.1)',
+                      color: u.role === 'admin' ? '#6366f1' : '#64748b'
+                    }}>
                       {u.role === 'admin' ? '管理员' : '用户'}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{dayjs(u.createdAt).format('YYYY-MM-DD')}</td>
-                  <td className="px-6 py-4 text-right">
+                  <td style={{ padding: '1rem', color: '#64748b' }}>
+                    {dayjs(u.created_at || u.createdAt).format('YYYY-MM-DD')}
+                  </td>
+                  <td style={{ padding: '1rem' }}>
                     <button
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                       onClick={() => setSelectedUser(u)}
+                      style={{
+                        padding: '0.5rem 1rem',
+                        background: '#f1f5f9',
+                        border: 'none',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        fontWeight: 500
+                      }}
                     >
-                      <Eye className="w-4 h-4" />
+                      <Eye size={16} />
+                      <span style={{ marginLeft: '0.25rem' }}>详情</span>
                     </button>
                   </td>
                 </tr>
@@ -301,14 +351,43 @@ export default function UsersTab() {
             </tbody>
           </table>
         </div>
-        
-        {filteredUsers.length === 0 && (
-          <div className="text-center py-12 text-gray-500">
-            <Users className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-            <p>暂无数据</p>
-          </div>
-        )}
-      </div>
+      )}
+      
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', marginTop: '2rem' }}>
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            style={{
+              padding: '0.5rem 1rem',
+              background: page === 1 ? '#e2e8f0' : '#f1f5f9',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: page === 1 ? 'not-allowed' : 'pointer',
+              color: page === 1 ? '#94a3b8' : '#64748b'
+            }}
+          >
+            上一页
+          </button>
+          <span style={{ padding: '0.5rem 1rem', color: '#64748b' }}>
+            第 {page} / {totalPages} 页
+          </span>
+          <button
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            style={{
+              padding: '0.5rem 1rem',
+              background: page === totalPages ? '#e2e8f0' : '#f1f5f9',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: page === totalPages ? 'not-allowed' : 'pointer',
+              color: page === totalPages ? '#94a3b8' : '#64748b'
+            }}
+          >
+            下一页
+          </button>
+        </div>
+      )}
       
       {selectedUser && (
         <UserDetailModal

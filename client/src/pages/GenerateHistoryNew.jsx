@@ -474,7 +474,7 @@ function GenerateHistory() {
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
                           <Calendar size={10} />
-                          {dayjs(item.createdAt).format('MM-DD HH:mm')}
+                          {dayjs(item.createdAt || item.created_at).format('MM-DD HH:mm')}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                           <span style={{ fontWeight: 500 }}>{getModelDisplayName(item.modelName)}</span>

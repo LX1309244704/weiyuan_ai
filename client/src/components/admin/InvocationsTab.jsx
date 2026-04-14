@@ -127,7 +127,7 @@ function TaskDetailModal({ task, onClose }) {
         </div>
         <div>
           <p style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>创建时间</p>
-          <p style={{ fontSize: '0.875rem' }}>{dayjs(task.createdAt).format('YYYY-MM-DD HH:mm:ss')}</p>
+          <p style={{ fontSize: '0.875rem' }}>{dayjs(task.created_at || task.createdAt).format('YYYY-MM-DD HH:mm:ss')}</p>
         </div>
       </div>
       
@@ -401,7 +401,7 @@ export default function InvocationsTab() {
               { 
                 key: 'createdAt', 
                 title: '时间',
-                render: r => <span style={{ color: '#94a3b8' }}>{dayjs(r.createdAt).format('MM-DD HH:mm')}</span>
+                render: r => <span style={{ color: '#94a3b8' }}>{dayjs(r.created_at || r.createdAt).format('MM-DD HH:mm')}</span>
               },
               {
                 key: 'actions',

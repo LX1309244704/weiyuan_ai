@@ -4,6 +4,7 @@ import { useAuthStore } from '../context/AuthContext'
 import api from '../utils/api'
 import dayjs from 'dayjs'
 import InvocationsTab from '../components/admin/InvocationsTab'
+import UsersTab from '../components/admin/UsersTab'
 import { 
   LayoutDashboard, ShoppingCart, Users, DollarSign, Settings, 
   Home, Package, Search, Plus,
@@ -649,140 +650,6 @@ function OrdersTab() {
               <RefreshCw size={16} /> 退款
             </button>
           )}
-        </Modal>
-      )}
-    </div>
-  )
-}
-
-// ==================== Users ====================
-
-function UsersTab() {
-  const [users, setUsers] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [detail, setDetail] = useState(null)
-  const [userData, setUserData] = useState(null)
-  const [adjustAmount, setAdjustAmount] = useState('')
-  const [adjusting, setAdjusting] = useState(false)
-  
-  useEffect(() => { fetchUsers() }, [])
-  
-  const fetchUsers = async () => {
-    try {
-      const res = await api.get('/admin/users?limit=100')
-      setUsers(res.data.users || [])
-    } catch (e) { console.error(e) }
-    finally { setLoading(false) }
-  }
-  
-  const viewDetail = async (user) => {
-    setDetail(user)
-    try {
-      const res = await api.get(`/admin/users/${user.id}`)
-      setUserData(res.data)
-    } catch (e) { console.error(e) }
-  }
-  
-  const handleAdjust = async () => {
-    const changeValue = parseInt(adjustAmount)
-    if (!changeValue) return alert('请输入数量')
-    if (isNaN(changeValue)) return alert('请输入有效数字')
-    setAdjusting(true)
-    try {
-      await api.post(`/admin/users/${detail.id}/adjust-balance`, { 
-        change: changeValue, 
-        reason: '管理员调整' 
-      })
-      alert('调整成功')
-      setAdjustAmount('')
-      fetchUsers()
-      viewDetail({ ...detail, balance: detail.balance + changeValue })
-    } catch (e) {
-      alert('调整失败: ' + (e.response?.data?.error || e.message))
-    } finally {
-      setAdjusting(false)
-    }
-  }
-  
-  const filtered = users.filter(u =>
-    u.email?.toLowerCase().includes(search.toLowerCase()) ||
-    u.name?.toLowerCase().includes(search.toLowerCase())
-  )
-  
-  return (
-    <div>
-      <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-        <SearchInput value={search} onChange={setSearch} placeholder="搜索用户..." style={{ flex: 1 }} />
-        <span style={{ color: '#64748b', fontSize: '0.875rem', display: 'flex', alignItems: 'center' }}>共 {filtered.length} 位用户</span>
-      </div>
-      
-      <div className="card" style={{ padding: 0 }}>
-        {loading ? <LoadingSpinner /> : (
-          <Table
-            columns={[
-              { 
-                key: 'user', 
-                title: '用户',
-                render: r => (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                    <div style={{ width: '36px', height: '36px', borderRadius: '8px', background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 600, fontSize: '0.875rem' }}>
-                      {(r.email?.charAt(0) || 'U').toUpperCase()}
-                    </div>
-                    <div>
-                      <p style={{ fontWeight: 500, color: '#0f172a' }}>{r.name || '-'}</p>
-                      <p style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{r.email}</p>
-                    </div>
-                  </div>
-                )
-              },
-              { key: 'balance', title: '余额', align: 'right', render: r => <span style={{ fontWeight: 600, color: '#6366f1' }}>{r.balance}</span> },
-              { key: 'role', title: '角色', render: r => <span className={`badge ${r.role === 'admin' ? 'badge-primary' : 'badge-default'}`}>{r.role === 'admin' ? '管理员' : '用户'}</span> },
-              { key: 'createdAt', title: '注册时间', render: r => dayjs(r.createdAt).format('YYYY-MM-DD') },
-              { key: 'actions', title: '', align: 'right', render: r => <button onClick={() => viewDetail(r)} className="btn-outline" style={{ padding: '0.25rem 0.75rem', fontSize: '0.75rem' }}><Eye size={14} /> 详情</button> }
-            ]}
-            data={filtered}
-            emptyText="暂无用户"
-          />
-        )}
-      </div>
-      
-      {detail && (
-        <Modal title="用户详情" onClose={() => setDetail(null)}>
-          {userData ? (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem', padding: '1rem', background: '#f8fafc', borderRadius: '8px' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '10px', background: 'linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontWeight: 700, fontSize: '1.25rem' }}>
-                  {(userData.user?.email?.charAt(0) || 'U').toUpperCase()}
-                </div>
-                <div>
-                  <p style={{ fontWeight: 600, color: '#0f172a' }}>{userData.user?.name || '未设置'}</p>
-                  <p style={{ fontSize: '0.875rem', color: '#64748b' }}>{userData.user?.email}</p>
-                </div>
-              </div>
-              
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginBottom: '1rem' }}>
-                <InfoBlock label="当前余额" value={userData.user?.balance} highlight />
-                <InfoBlock label="累计购买" value={userData.user?.totalPurchased} />
-              </div>
-              
-              <div style={{ marginBottom: '1rem' }}>
-                <label style={{ display: 'block', fontSize: '0.875rem', color: '#64748b', marginBottom: '0.5rem' }}>API Key</label>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <code style={{ flex: 1, padding: '0.5rem 0.75rem', background: '#f8fafc', borderRadius: '6px', fontSize: '0.75rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{userData.user?.apiKey}</code>
-                  <button onClick={() => navigator.clipboard.writeText(userData.user?.apiKey)} className="btn-outline" style={{ padding: '0.5rem' }}><Copy size={16} /></button>
-                </div>
-              </div>
-              
-              <div style={{ padding: '1rem', background: '#f8fafc', borderRadius: '8px' }}>
-                <label style={{ display: 'block', fontSize: '0.875rem', color: '#64748b', marginBottom: '0.5rem' }}>调整余额</label>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <input type="number" className="input" value={adjustAmount} onChange={e => setAdjustAmount(e.target.value)} placeholder="正数增加，负数减少" />
-                  <button onClick={handleAdjust} disabled={adjusting} className="btn-primary">{adjusting ? '处理中...' : '确认'}</button>
-                </div>
-              </div>
-            </>
-          ) : <LoadingSpinner />}
         </Modal>
       )}
     </div>

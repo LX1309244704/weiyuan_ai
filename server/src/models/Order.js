@@ -22,11 +22,7 @@ module.exports = (sequelize, DataTypes) => {
     },
     skillId: {
       type: DataTypes.UUID,
-      allowNull: true,
-      references: {
-        model: 'skills',
-        key: 'id'
-      }
+      allowNull: true
     },
     endpointId: {
       type: DataTypes.UUID,

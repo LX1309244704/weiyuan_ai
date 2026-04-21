@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { Key, Wallet, ShoppingCart, Zap, Copy, RefreshCw, TrendingUp, TrendingDown, Clock, CheckCircle, XCircle, Plus, ArrowLeft, Gift } from 'lucide-react'
+import { Key, Wallet, ShoppingCart, Zap, Copy, RefreshCw, TrendingUp, TrendingDown, Clock, CheckCircle, XCircle, Plus, ArrowLeft, Gift, Lock } from 'lucide-react'
 import { useAuthStore } from '../context/AuthContext'
 import api from '../utils/api'
 import dayjs from 'dayjs'
@@ -48,6 +48,10 @@ function ProfileNew() {
   const [resettingKey, setResettingKey] = useState(false)
   const [couponCode, setCouponCode] = useState('')
   const [redeeming, setRedeeming] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [changingPwd, setChangingPwd] = useState(false)
   const [pageSize, setPageSize] = useState(10)
   const [currentPage, setCurrentPage] = useState(1)
   const [pagination, setPagination] = useState({ total: 0, pages: 0 })
@@ -124,6 +128,39 @@ function ProfileNew() {
     }
   }
   
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      alert('请填写所有密码字段')
+      return
+    }
+    
+    if (newPassword.length < 6) {
+      alert('新密码长度至少6位')
+      return
+    }
+    
+    if (newPassword !== confirmPassword) {
+      alert('两次输入的新密码不一致')
+      return
+    }
+    
+    setChangingPwd(true)
+    try {
+      await api.post('/users/change-password', {
+        currentPassword,
+        newPassword
+      })
+      alert('密码修改成功')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmPassword('')
+    } catch (error) {
+      alert('修改失败: ' + (error.response?.data?.error || error.message))
+    } finally {
+      setChangingPwd(false)
+    }
+  }
+  
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text)
     alert('已复制到剪贴板')
@@ -164,6 +201,7 @@ function ProfileNew() {
   
   const tabs = [
     { key: 'api-key', label: 'API Key', icon: Key },
+    { key: 'password', label: '修改密码', icon: Lock },
     { key: 'balance', label: '余额明细', icon: Wallet },
     { key: 'orders', label: '订单记录', icon: ShoppingCart },
     { key: 'usage', label: '调用记录', icon: Zap }
@@ -461,6 +499,96 @@ function ProfileNew() {
                   <RefreshCw size={16} className={resettingKey ? 'animate-spin' : ''} />
                   {resettingKey ? '重置中...' : '重置 API Key'}
                 </button>
+              </div>
+            )}
+            
+            {activeTab === 'password' && (
+              <div>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: 600, marginBottom: '1rem', color: 'var(--ai-text-primary)' }}>
+                  修改登录密码
+                </h3>
+                <p style={{ color: 'var(--ai-text-secondary)', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
+                  修改登录密码后需要重新登录
+                </p>
+                
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', maxWidth: '400px' }}>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--ai-text-primary)', fontWeight: 500 }}>
+                      当前密码
+                    </label>
+                    <input
+                      type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
+                      placeholder="请输入当前密码"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid var(--ai-border-color)',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        background: 'var(--ai-bg-elevated)',
+                        color: 'var(--ai-text-primary)'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--ai-text-primary)', fontWeight: 500 }}>
+                      新密码
+                    </label>
+                    <input
+                      type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="请输入新密码（至少6位）"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid var(--ai-border-color)',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        background: 'var(--ai-bg-elevated)',
+                        color: 'var(--ai-text-primary)'
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--ai-text-primary)', fontWeight: 500 }}>
+                      确认新密码
+                    </label>
+                    <input
+                      type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="请再次输入新密码"
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem',
+                        border: '1px solid var(--ai-border-color)',
+                        borderRadius: '8px',
+                        fontSize: '1rem',
+                        background: 'var(--ai-bg-elevated)',
+                        color: 'var(--ai-text-primary)'
+                      }}
+                    />
+                  </div>
+                  <button
+                    onClick={handleChangePassword}
+                    disabled={changingPwd}
+                    style={{
+                      padding: '0.75rem 1.5rem',
+                      background: 'var(--ai-accent-primary)',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: changingPwd ? 'not-allowed' : 'pointer',
+                      fontWeight: 600,
+                      fontSize: '1rem'
+                    }}
+                  >
+                    {changingPwd ? '修改中...' : '确认修改'}
+                  </button>
+                </div>
               </div>
             )}
             

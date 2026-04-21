@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const { Op } = require('sequelize');
 const { User, Order, BalanceLog, Invocation, ApiEndpoint, ApiInvocation, AiModel, AiGenerateTask, Coupon, sequelize } = require('../models');
 const { encrypt, decrypt } = require('../utils/encryption');
@@ -197,6 +198,35 @@ router.get('/users/:id', requireAdmin, async (req, res, next) => {
     }
     
     res.json({ success: true, user });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * 重置用户密码
+ * POST /api/admin/users/:id/reset-password
+ */
+router.post('/users/:id/reset-password', requireAdmin, async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { newPassword } = req.body;
+    
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
+    }
+    
+    const user = await User.findByPk(id);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+    await user.save();
+    
+    res.json({ success: true, message: 'Password reset successfully' });
   } catch (error) {
     next(error);
   }

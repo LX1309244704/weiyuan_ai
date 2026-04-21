@@ -24,6 +24,8 @@ function UserDetailModal({ user, onClose, onAdjustBalance }) {
   const [loading, setLoading] = useState(true)
   const [adjustAmount, setAdjustAmount] = useState('')
   const [adjusting, setAdjusting] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [resettingPwd, setResettingPwd] = useState(false)
   
   useEffect(() => {
     if (user) {
@@ -58,6 +60,26 @@ function UserDetailModal({ user, onClose, onAdjustBalance }) {
       alert('调整失败: ' + (error.response?.data?.error || error.message))
     } finally {
       setAdjusting(false)
+    }
+  }
+  
+  const handleResetPassword = async () => {
+    if (!newPassword || newPassword.length < 6) {
+      alert('密码长度至少6位')
+      return
+    }
+    
+    if (!confirm('确定要重置该用户的登录密码吗？')) return
+    
+    setResettingPwd(true)
+    try {
+      await api.post(`/admin/users/${user.id}/reset-password`, { newPassword })
+      alert('密码重置成功')
+      setNewPassword('')
+    } catch (error) {
+      alert('重置失败: ' + (error.response?.data?.error || error.message))
+    } finally {
+      setResettingPwd(false)
     }
   }
   
@@ -203,6 +225,41 @@ function UserDetailModal({ user, onClose, onAdjustBalance }) {
                 </button>
               </div>
               <p style={{ fontSize: '0.875rem', color: '#64748b', margin: 0 }}>正数增加余额，负数减少余额</p>
+            </div>
+            
+            <div style={{ padding: '1.5rem', background: '#fef3c7', borderRadius: '10px', marginTop: '1rem' }}>
+              <p style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '1rem' }}>重置登录密码</p>
+              <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="新密码（至少6位）"
+                  style={{
+                    flex: 1,
+                    padding: '0.75rem',
+                    border: '1px solid #f59e0b',
+                    borderRadius: '8px',
+                    fontSize: '1rem'
+                  }}
+                />
+                <button
+                  onClick={handleResetPassword}
+                  disabled={resettingPwd}
+                  style={{
+                    padding: '0.75rem 1.5rem',
+                    background: '#f59e0b',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: resettingPwd ? 'not-allowed' : 'pointer',
+                    fontWeight: 600
+                  }}
+                >
+                  {resettingPwd ? '处理中...' : '重置密码'}
+                </button>
+              </div>
+              <p style={{ fontSize: '0.875rem', color: '#92400e', margin: 0 }}>重置后用户需使用新密码登录</p>
             </div>
           </div>
         )}

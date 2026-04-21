@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { v4: uuidv4 } = require('uuid');
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
 const { User, BalanceLog, Order, Invocation, ApiInvocation, ApiEndpoint } = require('../models');
 const { redis, KEYS } = require('../config/redis');
 
@@ -201,6 +202,43 @@ router.get('/orders', authenticate, async (req, res, next) => {
   } catch (error) {
     console.error('[Orders] Error:', error.message);
     res.json({ orders: [], pagination: { total: 0, page: 1, limit: 20, pages: 0 } });
+  }
+});
+
+/**
+ * Change password
+ * POST /api/users/change-password
+ */
+router.post('/change-password', authenticate, async (req, res, next) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Current password and new password required' });
+    }
+    
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
+    }
+    
+    const user = await User.findByPk(req.user.userId);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const isValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isValid) {
+      return res.status(400).json({ error: 'Current password is incorrect' });
+    }
+    
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    user.password = hashedPassword;
+    await user.save();
+    
+    res.json({ success: true, message: 'Password changed successfully' });
+  } catch (error) {
+    next(error);
   }
 });
 
